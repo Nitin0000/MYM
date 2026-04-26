@@ -3,7 +3,7 @@ import React from 'react';
 import { Platform, StyleSheet, View } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
-import { Colors } from '../../constants/Theme';
+import { Colors } from '@/constants/Theme';
 
 export default function TabLayout() {
   return (
@@ -31,6 +31,7 @@ export default function TabLayout() {
           letterSpacing: 0.3,
         },
       }}>
+
       <Tabs.Screen
         name="index"
         options={{
@@ -40,17 +41,7 @@ export default function TabLayout() {
           ),
         }}
       />
-      <Tabs.Screen
-        name="add"
-        options={{
-          title: '',
-          tabBarIcon: ({ focused }) => (
-            <View style={styles.addBtn}>
-              <Ionicons name="add" size={30} color="#fff" />
-            </View>
-          ),
-        }}
-      />
+
       <Tabs.Screen
         name="transactions"
         options={{
@@ -60,6 +51,30 @@ export default function TabLayout() {
           ),
         }}
       />
+
+      {/* Centre FAB-style Add button */}
+      <Tabs.Screen
+        name="add"
+        options={{
+          title: '',
+          tabBarIcon: () => (
+            <View style={styles.addBtn}>
+              <Ionicons name="add" size={30} color="#fff" />
+            </View>
+          ),
+        }}
+      />
+
+      <Tabs.Screen
+        name="profile"
+        options={{
+          title: 'Profile',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'person' : 'person-outline'} size={22} color={color} />
+          ),
+        }}
+      />
+
     </Tabs>
   );
 }

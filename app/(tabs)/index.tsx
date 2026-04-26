@@ -19,7 +19,7 @@ type Transaction = {
 };
 
 export default function DashboardScreen() {
-  const { user, signOut } = useAuth();
+  const { user } = useAuth();
   const [balance, setBalance] = useState(0);
   const [income, setIncome] = useState(0);
   const [expense, setExpense] = useState(0);
@@ -77,9 +77,9 @@ export default function DashboardScreen() {
           <Text style={styles.greeting}>Good day, {firstName} 👋</Text>
           <Text style={styles.subGreeting}>Here's your financial overview</Text>
         </View>
-        <TouchableOpacity onPress={signOut} style={styles.avatarBtn}>
+        <View style={styles.avatarBtn}>
           <Ionicons name="person-circle" size={38} color={Colors.primary} />
-        </TouchableOpacity>
+        </View>
       </View>
 
       <ScrollView
