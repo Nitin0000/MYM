@@ -8,6 +8,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/hooks/useAuth';
 import { Colors, Gradients, Spacing, Radius } from '@/constants/Theme';
+import { Icons } from '@/constants/Icons';
 
 export default function ProfileScreen() {
   const { user, signOut } = useAuth();
@@ -41,14 +42,14 @@ export default function ProfileScreen() {
   };
 
   const infoRows = [
-    { icon: 'mail-outline', label: 'Email', value: email },
-    { icon: 'person-outline', label: 'Name', value: displayName },
+    { icon: Icons.email, label: 'Email', value: email },
+    { icon: Icons.name, label: 'Name', value: displayName },
     {
-      icon: provider === 'google' ? 'logo-google' : 'lock-closed-outline',
+      icon: provider === 'google' ? Icons.google : Icons.password,
       label: 'Sign-in method',
       value: provider === 'google' ? 'Google' : 'Email & Password',
     },
-    { icon: 'calendar-outline', label: 'Member since', value: joinedDate },
+    { icon: Icons.calendar, label: 'Member since', value: joinedDate },
   ];
 
   return (
@@ -73,7 +74,7 @@ export default function ProfileScreen() {
           <Text style={styles.emailText}>{email}</Text>
           <View style={styles.providerBadge}>
             <Ionicons
-              name={provider === 'google' ? 'logo-google' : 'mail'}
+              name={provider === 'google' ? Icons.google : Icons.mailProvider}
               size={12}
               color={Colors.primary}
             />
@@ -103,7 +104,7 @@ export default function ProfileScreen() {
 
         {/* Sign out button */}
         <TouchableOpacity style={styles.signOutBtn} onPress={handleSignOut} activeOpacity={0.8}>
-          <Ionicons name="log-out-outline" size={20} color={Colors.danger} />
+          <Ionicons name={Icons.logout} size={20} color={Colors.danger} />
           <Text style={styles.signOutText}>Sign Out</Text>
         </TouchableOpacity>
 

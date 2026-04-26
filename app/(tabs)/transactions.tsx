@@ -9,6 +9,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/hooks/useAuth';
 import { Colors, Gradients, Spacing, Radius } from '@/constants/Theme';
+import { formatCurrency } from '@/utils/currency';
+import { Icons } from '@/constants/Icons';
 
 type Transaction = {
   id: string;
@@ -54,7 +56,7 @@ export default function TransactionsScreen() {
     return (
       <View style={styles.card}>
         <View style={[styles.icon, { backgroundColor: `${color}22` }]}>
-          <Ionicons name={(item.categories?.icon as any) || (isIncome ? 'cash' : 'cart')} size={22} color={color} />
+          <Ionicons name={(item.categories?.icon as any) || (isIncome ? Icons.cash : Icons.cart)} size={22} color={color} />
         </View>
         <View style={styles.details}>
           <Text style={styles.title} numberOfLines={1}>
@@ -66,7 +68,7 @@ export default function TransactionsScreen() {
         </View>
         <View style={styles.right}>
           <Text style={[styles.amount, { color: isIncome ? Colors.success : Colors.danger }]}>
-            {isIncome ? '+' : '-'}${Number(item.amount).toFixed(2)}
+            {isIncome ? '+' : '-'}{formatCurrency(item.amount)}
           </Text>
           <View style={[styles.typePill, { backgroundColor: `${color}22` }]}>
             <Text style={[styles.typeLabel, { color }]}>
@@ -120,7 +122,7 @@ export default function TransactionsScreen() {
           refreshing={loading}
           ListEmptyComponent={
             <View style={styles.empty}>
-              <Ionicons name="receipt-outline" size={60} color={Colors.textMuted} />
+              <Ionicons name={Icons.emptyTransactions} size={60} color={Colors.textMuted} />
               <Text style={styles.emptyTitle}>No transactions</Text>
               <Text style={styles.emptyBody}>
                 {filter === 'all' ? 'Add your first transaction using the + button.' : `No ${filter} transactions found.`}

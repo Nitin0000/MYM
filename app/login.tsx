@@ -11,6 +11,7 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Colors, Gradients, Spacing, Radius } from '@/constants/Theme';
 import { Ionicons } from '@expo/vector-icons';
 import { supabase } from '@/lib/supabase';
+import { Icons } from '@/constants/Icons';
 
 type Mode = 'signin' | 'signup';
 
@@ -86,7 +87,7 @@ export default function LoginScreen() {
             <View style={styles.logoSection}>
               <View style={styles.logoIcon}>
                 <LinearGradient colors={Gradients.primary} style={styles.logoGradient}>
-                  <Ionicons name="wallet" size={36} color="#fff" />
+                  <Ionicons name={Icons.wallet} size={36} color="#fff" />
                 </LinearGradient>
               </View>
               <Text style={styles.appName}>MYM</Text>
@@ -113,7 +114,7 @@ export default function LoginScreen() {
 
               {/* Email field */}
               <View style={styles.field}>
-                <Ionicons name="mail-outline" size={18} color={Colors.textMuted} />
+                <Ionicons name={Icons.email} size={18} color={Colors.textMuted} />
                 <TextInput
                   style={styles.fieldInput}
                   placeholder="Email address"
@@ -128,7 +129,7 @@ export default function LoginScreen() {
 
               {/* Password field */}
               <View style={styles.field}>
-                <Ionicons name="lock-closed-outline" size={18} color={Colors.textMuted} />
+                <Ionicons name={Icons.password} size={18} color={Colors.textMuted} />
                 <TextInput
                   style={styles.fieldInput}
                   placeholder="Password"
@@ -141,7 +142,7 @@ export default function LoginScreen() {
                 />
                 <TouchableOpacity onPress={() => setShowPassword((v) => !v)} hitSlop={8}>
                   <Ionicons
-                    name={showPassword ? 'eye-off-outline' : 'eye-outline'}
+                    name={showPassword ? Icons.eyeOff : Icons.eye}
                     size={18}
                     color={Colors.textMuted}
                   />

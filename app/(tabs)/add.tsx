@@ -11,6 +11,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Gradients, Spacing, Radius } from '@/constants/Theme';
+import { Icons } from '@/constants/Icons';
 
 const QUICK_CATEGORIES = {
   expense: ['Food', 'Transport', 'Shopping', 'Bills', 'Health'],
@@ -62,7 +63,7 @@ export default function AddTransactionScreen() {
             user_id: user?.id,
             name: categoryName.trim(),
             type,
-            icon: isExpense ? 'cart' : 'cash',
+            icon: isExpense ? Icons.cart : Icons.cash,
             color: accentColor,
           })
           .select('id')
@@ -113,7 +114,7 @@ export default function AddTransactionScreen() {
                   activeOpacity={0.8}
                 >
                   <Ionicons
-                    name={t === 'expense' ? 'arrow-up-circle' : 'arrow-down-circle'}
+                    name={t === 'expense' ? Icons.expense : Icons.income}
                     size={18}
                     color={active ? '#fff' : Colors.textMuted}
                   />
@@ -127,7 +128,7 @@ export default function AddTransactionScreen() {
 
           {/* Amount Display */}
           <LinearGradient colors={gradColors} style={styles.amountCard} start={{ x: 0, y: 0 }} end={{ x: 1, y: 1 }}>
-            <Text style={styles.amountPrefix}>{isExpense ? '-' : '+'}</Text>
+            <Text style={styles.amountPrefix}>{isExpense ? '-₹' : '+₹'}</Text>
             <TextInput
               style={styles.amountInput}
               placeholder="0.00"
@@ -161,7 +162,7 @@ export default function AddTransactionScreen() {
           {/* Inputs */}
           <View style={styles.fieldGroup}>
             <View style={styles.field}>
-              <Ionicons name="pricetag-outline" size={18} color={Colors.textMuted} />
+              <Ionicons name={Icons.tag} size={18} color={Colors.textMuted} />
               <TextInput
                 style={styles.fieldInput}
                 placeholder="Custom category…"
@@ -172,7 +173,7 @@ export default function AddTransactionScreen() {
             </View>
             <View style={styles.fieldSeparator} />
             <View style={styles.field}>
-              <Ionicons name="create-outline" size={18} color={Colors.textMuted} />
+              <Ionicons name={Icons.edit} size={18} color={Colors.textMuted} />
               <TextInput
                 style={styles.fieldInput}
                 placeholder="Note (optional)"
@@ -186,7 +187,7 @@ export default function AddTransactionScreen() {
           {/* Save Button */}
           <TouchableOpacity onPress={handleSave} disabled={isLoading} activeOpacity={0.85}>
             <LinearGradient colors={gradColors} style={styles.saveBtn} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
-              <Ionicons name={isLoading ? 'hourglass' : 'checkmark-circle'} size={22} color="#fff" />
+              <Ionicons name={isLoading ? Icons.loading : Icons.success} size={22} color="#fff" />
               <Text style={styles.saveBtnText}>{isLoading ? 'Saving…' : 'Save Transaction'}</Text>
             </LinearGradient>
           </TouchableOpacity>

@@ -9,6 +9,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/hooks/useAuth';
 import { Colors, Gradients, Spacing, Radius } from '@/constants/Theme';
+import { formatCurrency } from '@/utils/currency';
+import { Icons } from '@/constants/Icons';
 
 type Transaction = {
   id: string;
@@ -82,7 +84,7 @@ export default function DashboardScreen() {
           <Text style={styles.subGreeting}>Here's your financial overview</Text>
         </View>
         <TouchableOpacity onPress={() => router.push('/profile')} style={styles.avatarBtn} activeOpacity={0.8}>
-          <Ionicons name="person-circle" size={38} color={Colors.primary} />
+          <Ionicons name={Icons.profile} size={38} color={Colors.primary} />
         </TouchableOpacity>
       </View>
 
@@ -105,13 +107,13 @@ export default function DashboardScreen() {
 
           <Text style={styles.balanceLabel}>Total Balance</Text>
           <Text style={styles.balanceAmount}>
-            ${balance.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+            {formatCurrency(balance, 2)}
           </Text>
 
           <View style={styles.statsRow}>
-            <StatBox label="Income" amount={income} color={Colors.success} icon="arrow-down" />
+            <StatBox label="Income" amount={income} color={Colors.success} icon={Icons.income} />
             <View style={styles.statDivider} />
-            <StatBox label="Expenses" amount={expense} color={Colors.danger} icon="arrow-up" />
+            <StatBox label="Expenses" amount={expense} color={Colors.danger} icon={Icons.expense} />
           </View>
         </LinearGradient>
 
@@ -122,7 +124,7 @@ export default function DashboardScreen() {
 
         {recentTransactions.length === 0 ? (
           <View style={styles.empty}>
-            <Ionicons name="leaf-outline" size={48} color={Colors.textMuted} />
+            <Ionicons name={Icons.emptyDashboard} size={48} color={Colors.textMuted} />
             <Text style={styles.emptyTitle}>All clear!</Text>
             <Text style={styles.emptyBody}>Tap + to add your first transaction.</Text>
           </View>
@@ -139,17 +141,17 @@ export default function DashboardScreen() {
 /* ─── Sub-components ──────────────────────────────────── */
 
 function StatBox({ label, amount, color, icon }: {
-  label: string; amount: number; color: string; icon: string;
+  label: string; amount: number; color: string; icon: any;
 }) {
   return (
     <View style={statStyles.box}>
       <View style={[statStyles.iconCircle, { backgroundColor: `${color}22` }]}>
-        <Ionicons name={`${icon}-circle` as any} size={20} color={color} />
+        <Ionicons name={icon} size={20} color={color} />
       </View>
       <View style={{ flex: 1 }}>
         <Text style={statStyles.label} numberOfLines={1}>{label}</Text>
         <Text style={[statStyles.amount, { color }]} numberOfLines={1} adjustsFontSizeToFit>
-          ${Number(amount).toFixed()}
+          {formatCurrency(amount, 0)}
         </Text>
       </View>
     </View>
@@ -164,7 +166,7 @@ function TransactionRow({ tx }: { tx: Transaction }) {
     <View style={rowStyles.card}>
       <View style={[rowStyles.iconWrap, { backgroundColor: `${bgColor}22` }]}>
         <Ionicons
-          name={(tx.categories?.icon as any) || (isIncome ? 'cash' : 'cart')}
+          name={(tx.categories?.icon as any) || (isIncome ? Icons.cash : Icons.cart)}
           size={20}
           color={bgColor}
         />
@@ -180,7 +182,7 @@ function TransactionRow({ tx }: { tx: Transaction }) {
         </Text>
       </View>
       <Text style={[rowStyles.amount, { color: isIncome ? Colors.success : Colors.danger }]}>
-        {isIncome ? '+' : '-'}${Number(tx.amount).toFixed(2)}
+        {isIncome ? '+' : '-'}{formatCurrency(tx.amount)}
       </Text>
     </View>
   );
