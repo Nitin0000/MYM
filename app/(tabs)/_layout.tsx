@@ -4,8 +4,11 @@ import { Platform, StyleSheet, View } from 'react-native';
 import { BlurView } from 'expo-blur';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors } from '@/constants/Theme';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 
 export default function TabLayout() {
+  const insets = useSafeAreaInsets();
+  
   return (
     <Tabs
       screenOptions={{
@@ -18,8 +21,8 @@ export default function TabLayout() {
           borderTopColor: Colors.cardBorder,
           elevation: 0,
           backgroundColor: 'transparent',
-          height: Platform.OS === 'ios' ? 88 : 68,
-          paddingBottom: Platform.OS === 'ios' ? 28 : 12,
+          height: 60 + Math.max(insets.bottom, 10),
+          paddingBottom: Math.max(insets.bottom, 10),
           paddingTop: 10,
         },
         tabBarBackground: () => (
@@ -71,6 +74,16 @@ export default function TabLayout() {
           title: 'Profile',
           tabBarIcon: ({ color, focused }) => (
             <Ionicons name={focused ? 'person' : 'person-outline'} size={22} color={color} />
+          ),
+        }}
+      />
+
+      <Tabs.Screen
+        name="about"
+        options={{
+          title: 'About',
+          tabBarIcon: ({ color, focused }) => (
+            <Ionicons name={focused ? 'information-circle' : 'information-circle-outline'} size={22} color={color} />
           ),
         }}
       />

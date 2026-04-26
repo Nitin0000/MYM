@@ -114,7 +114,7 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bg },
-  scroll: { padding: Spacing.lg, paddingBottom: 110, gap: Spacing.lg },
+  scroll: { padding: Spacing.lg, paddingTop: 40, paddingBottom: 110, gap: Spacing.lg },
 
   pageTitle: {
     fontSize: 26,

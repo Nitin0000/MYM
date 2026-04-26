@@ -18,8 +18,11 @@ type Transaction = {
   categories: { name: string; icon: string; color: string } | null;
 };
 
+import { useRouter } from 'expo-router';
+
 export default function DashboardScreen() {
   const { user } = useAuth();
+  const router = useRouter();
   const [balance, setBalance] = useState(0);
   const [income, setIncome] = useState(0);
   const [expense, setExpense] = useState(0);
@@ -77,9 +80,9 @@ export default function DashboardScreen() {
           <Text style={styles.greeting}>Good day, {firstName} 👋</Text>
           <Text style={styles.subGreeting}>Here's your financial overview</Text>
         </View>
-        <View style={styles.avatarBtn}>
+        <TouchableOpacity onPress={() => router.push('/profile')} style={styles.avatarBtn} activeOpacity={0.8}>
           <Ionicons name="person-circle" size={38} color={Colors.primary} />
-        </View>
+        </TouchableOpacity>
       </View>
 
       <ScrollView
@@ -191,7 +194,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: Spacing.lg,
-    paddingTop: Spacing.md,
+    paddingTop: 40,
     paddingBottom: Spacing.sm,
   },
   greeting: { fontSize: 18, fontWeight: '700', color: Colors.textPrimary },
