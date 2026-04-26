@@ -1,8 +1,9 @@
 import React, { useEffect, useState } from 'react';
 import {
-  StyleSheet, Text, View, SafeAreaView, ScrollView,
+  StyleSheet, Text, View, ScrollView,
   RefreshControl, TouchableOpacity,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
@@ -145,10 +146,10 @@ function StatBox({ label, amount, color, icon }: {
       <View style={[statStyles.iconCircle, { backgroundColor: `${color}22` }]}>
         <Ionicons name={`${icon}-circle` as any} size={20} color={color} />
       </View>
-      <View>
-        <Text style={statStyles.label}>{label}</Text>
-        <Text style={[statStyles.amount, { color }]}>
-          ${amount.toLocaleString('en-US', { minimumFractionDigits: 2 })}
+      <View style={{ flex: 1 }}>
+        <Text style={statStyles.label} numberOfLines={1}>{label}</Text>
+        <Text style={[statStyles.amount, { color }]} numberOfLines={1} adjustsFontSizeToFit>
+          ${Number(amount).toFixed()}
         </Text>
       </View>
     </View>
@@ -194,7 +195,7 @@ const styles = StyleSheet.create({
     justifyContent: 'space-between',
     alignItems: 'center',
     paddingHorizontal: Spacing.lg,
-    paddingTop: 40,
+    paddingTop: Spacing.md,
     paddingBottom: Spacing.sm,
   },
   greeting: { fontSize: 18, fontWeight: '700', color: Colors.textPrimary },
@@ -239,7 +240,7 @@ const styles = StyleSheet.create({
 });
 
 const statStyles = StyleSheet.create({
-  box: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
+  box: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 2 },
   iconCircle: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
   label: { fontSize: 11, color: 'rgba(255,255,255,0.6)', marginBottom: 2 },
   amount: { fontSize: 15, fontWeight: '700' },

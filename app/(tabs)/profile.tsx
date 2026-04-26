@@ -1,8 +1,9 @@
 import React from 'react';
 import {
-  View, Text, StyleSheet, SafeAreaView,
+  View, Text, StyleSheet,
   TouchableOpacity, ScrollView, Alert,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/hooks/useAuth';
@@ -114,7 +115,7 @@ export default function ProfileScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bg },
-  scroll: { padding: Spacing.lg, paddingTop: 40, paddingBottom: 110, gap: Spacing.lg },
+  scroll: { padding: Spacing.lg, paddingTop: Spacing.md, paddingBottom: 110, gap: Spacing.lg },
 
   pageTitle: {
     fontSize: 26,

@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import {
-  StyleSheet, Text, View, SafeAreaView, TextInput,
+  StyleSheet, Text, View, TextInput,
   TouchableOpacity, Alert, KeyboardAvoidingView,
   Platform, ScrollView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
 import { LinearGradient } from 'expo-linear-gradient';
 import { useAuth } from '@/hooks/useAuth';
@@ -198,7 +199,7 @@ export default function AddTransactionScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bg },
-  scroll: { padding: Spacing.lg, paddingTop: 40, paddingBottom: 120, gap: Spacing.lg },
+  scroll: { padding: Spacing.lg, paddingTop: Spacing.md, paddingBottom: 120, gap: Spacing.lg },
   pageTitle: { fontSize: 26, fontWeight: '800', color: Colors.textPrimary, letterSpacing: -0.3 },
 
   // Type toggle

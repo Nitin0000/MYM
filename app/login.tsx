@@ -1,9 +1,10 @@
 import React, { useState } from 'react';
 import {
-  View, Text, StyleSheet, SafeAreaView,
+  View, Text, StyleSheet,
   TextInput, TouchableOpacity, ActivityIndicator,
   Alert, KeyboardAvoidingView, Platform, ScrollView,
 } from 'react-native';
+import { SafeAreaView } from 'react-native-safe-area-context';
 import { Stack } from 'expo-router';
 import GoogleSignInButton from '@/components/GoogleSignInButton';
 import { LinearGradient } from 'expo-linear-gradient';
