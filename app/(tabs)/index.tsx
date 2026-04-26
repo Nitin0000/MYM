@@ -1,7 +1,7 @@
 import React, { useEffect, useState } from 'react';
 import {
   StyleSheet, Text, View, ScrollView,
-  RefreshControl, TouchableOpacity,
+  RefreshControl, TouchableOpacity, Image
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
@@ -79,9 +79,12 @@ export default function DashboardScreen() {
 
       {/* Header */}
       <View style={styles.header}>
-        <View>
-          <Text style={styles.greeting}>Good day, {firstName} 👋</Text>
-          <Text style={styles.subGreeting}>Here's your financial overview</Text>
+        <View style={styles.headerLeft}>
+          <Image source={require('@/assets/images/logo.png')} style={styles.headerLogo} />
+          <View>
+            <Text style={styles.greeting}>Good day, {firstName} 👋</Text>
+            <Text style={styles.subGreeting}>Here's your financial overview</Text>
+          </View>
         </View>
         <TouchableOpacity onPress={() => router.push('/profile')} style={styles.avatarBtn} activeOpacity={0.8}>
           <Ionicons name={Icons.profile} size={38} color={Colors.primary} />
@@ -199,6 +202,17 @@ const styles = StyleSheet.create({
     paddingHorizontal: Spacing.lg,
     paddingTop: Spacing.md,
     paddingBottom: Spacing.sm,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: Spacing.sm,
+  },
+  headerLogo: {
+    width: 40,
+    height: 40,
+    borderRadius: 12,
+    resizeMode: 'cover',
   },
   greeting: { fontSize: 18, fontWeight: '700', color: Colors.textPrimary },
   subGreeting: { fontSize: 13, color: Colors.textSecondary, marginTop: 2 },

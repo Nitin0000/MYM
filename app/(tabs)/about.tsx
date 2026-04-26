@@ -1,7 +1,7 @@
 import React from 'react';
 import {
   StyleSheet, Text, View, ScrollView,
-  TouchableOpacity, Linking
+  TouchableOpacity, Linking, Image
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { LinearGradient } from 'expo-linear-gradient';
@@ -35,7 +35,7 @@ export default function AboutScreen() {
           end={{ x: 1, y: 1 }}
         >
           <View style={styles.iconCircle}>
-            <Ionicons name="bulb-outline" size={32} color="#fff" />
+            <Image source={require('@/assets/images/logo.png')} style={styles.logoImage} />
           </View>
           <Text style={styles.visionTitle}>AI-Powered Expense Manager</Text>
           <Text style={styles.visionText}>
@@ -111,6 +111,11 @@ const styles = StyleSheet.create({
     marginBottom: Spacing.md,
     borderWidth: 1,
     borderColor: 'rgba(255,255,255,0.3)',
+  },
+  logoImage: {
+    width: 56,
+    height: 56,
+    resizeMode: 'cover',
   },
   visionTitle: { fontSize: 20, fontWeight: '700', color: '#fff', marginBottom: 8 },
   visionText: { fontSize: 14, color: 'rgba(255,255,255,0.85)', lineHeight: 22 },

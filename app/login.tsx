@@ -1,6 +1,6 @@
 import React, { useState } from 'react';
 import {
-  View, Text, StyleSheet,
+  View, Text, StyleSheet, Image,
   TextInput, TouchableOpacity, ActivityIndicator,
   Alert, KeyboardAvoidingView, Platform, ScrollView,
 } from 'react-native';
@@ -86,9 +86,7 @@ export default function LoginScreen() {
             {/* Logo */}
             <View style={styles.logoSection}>
               <View style={styles.logoIcon}>
-                <LinearGradient colors={Gradients.primary} style={styles.logoGradient}>
-                  <Ionicons name={Icons.wallet} size={36} color="#fff" />
-                </LinearGradient>
+                <Image source={require('@/assets/images/logo.png')} style={styles.logoImage} />
               </View>
               <Text style={styles.appName}>MYM</Text>
               <Text style={styles.tagline}>Manage Your Money</Text>
@@ -222,7 +220,7 @@ const styles = StyleSheet.create({
     shadowRadius: 20,
     elevation: 12,
   },
-  logoGradient: { width: 72, height: 72, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
+  logoImage: { width: 80, height: 80, borderRadius: 24, resizeMode: 'cover' },
   appName: { fontSize: 42, fontWeight: '800', color: Colors.textPrimary, letterSpacing: 4 },
   tagline: { fontSize: 14, color: Colors.textSecondary, letterSpacing: 1.5 },
 
