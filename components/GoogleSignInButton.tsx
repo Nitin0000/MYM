@@ -1,11 +1,10 @@
-import React from 'react';
-import { TouchableOpacity, Text, StyleSheet, View, ActivityIndicator } from 'react-native';
-import { supabase } from '@/lib/supabase';
-import * as WebBrowser from 'expo-web-browser';
-import * as Linking from 'expo-linking';
-import { Image } from 'expo-image';
-import { useEffect, useState } from 'react';
 import { Colors, Radius, Spacing } from '@/constants/Theme';
+import { supabase } from '@/lib/supabase';
+import { Image } from 'expo-image';
+import * as Linking from 'expo-linking';
+import * as WebBrowser from 'expo-web-browser';
+import React, { useEffect, useState } from 'react';
+import { ActivityIndicator, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 
 WebBrowser.maybeCompleteAuthSession();
 
@@ -29,7 +28,9 @@ export default function GoogleSignInButton() {
   async function onSignInButtonPress() {
     setLoading(true);
     try {
-      const redirectUrl = Linking.createURL('/auth/callback');
+      const redirectUrl = Linking.createURL('/');
+      console.log('🔗 Redirect URL:', redirectUrl); // Add this to Supabase redirect list
+
 
       const res = await supabase.auth.signInWithOAuth({
         provider: 'google',
