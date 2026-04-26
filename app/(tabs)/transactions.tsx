@@ -167,7 +167,7 @@ const styles = StyleSheet.create({
 
   loader: { flex: 1 },
 
-  list: { paddingHorizontal: Spacing.lg, paddingBottom: 110 },
+  list: { paddingHorizontal: Spacing.lg, paddingBottom: 20 },
 
   card: {
     flexDirection: 'row',

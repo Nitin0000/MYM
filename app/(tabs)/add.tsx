@@ -200,7 +200,7 @@ export default function AddTransactionScreen() {
 
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bg },
-  scroll: { padding: Spacing.lg, paddingTop: Spacing.md, paddingBottom: 120, gap: Spacing.lg },
+  scroll: { padding: Spacing.lg, paddingTop: Spacing.md, paddingBottom: 40, gap: Spacing.lg },
   pageTitle: { fontSize: 26, fontWeight: '800', color: Colors.textPrimary, letterSpacing: -0.3 },
 
   // Type toggle

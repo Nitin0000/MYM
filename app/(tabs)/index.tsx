@@ -203,7 +203,7 @@ const styles = StyleSheet.create({
   greeting: { fontSize: 18, fontWeight: '700', color: Colors.textPrimary },
   subGreeting: { fontSize: 13, color: Colors.textSecondary, marginTop: 2 },
   avatarBtn: { padding: 4 },
-  scroll: { padding: Spacing.lg, paddingBottom: 110 },
+  scroll: { padding: Spacing.lg, paddingBottom: 20 },
   balanceCard: {
     borderRadius: Radius.xl,
     padding: Spacing.lg,
