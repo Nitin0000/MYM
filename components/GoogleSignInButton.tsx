@@ -28,7 +28,7 @@ export default function GoogleSignInButton() {
   async function onSignInButtonPress() {
     setLoading(true);
     try {
-      const redirectUrl = Linking.createURL('/');
+      const redirectUrl = Linking.createURL('');
       console.log('🔗 Redirect URL:', redirectUrl); // Add this to Supabase redirect list
 
 

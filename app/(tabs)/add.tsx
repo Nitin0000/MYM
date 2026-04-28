@@ -12,6 +12,7 @@ import { useRouter } from 'expo-router';
 import { Ionicons } from '@expo/vector-icons';
 import { Colors, Gradients, Spacing, Radius } from '@/constants/Theme';
 import { Icons } from '@/constants/Icons';
+import DateTimePicker from '@react-native-community/datetimepicker';
 
 const QUICK_CATEGORIES = {
   expense: ['Food', 'Transport', 'Shopping', 'Bills', 'Health'],
@@ -25,6 +26,8 @@ export default function AddTransactionScreen() {
   const [amount, setAmount] = useState('');
   const [categoryName, setCategoryName] = useState('');
   const [description, setDescription] = useState('');
+  const [date, setDate] = useState(new Date());
+  const [showDatePicker, setShowDatePicker] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
 
   const isExpense = type === 'expense';
@@ -78,7 +81,7 @@ export default function AddTransactionScreen() {
         amount: parsed,
         description: description.trim(),
         type,
-        date: new Date().toISOString().split('T')[0],
+        date: date.toISOString().split('T')[0],
       });
       if (txError) throw txError;
 
@@ -172,6 +175,17 @@ export default function AddTransactionScreen() {
               />
             </View>
             <View style={styles.fieldSeparator} />
+            <TouchableOpacity 
+              style={[styles.field, { height: 52 }]} 
+              onPress={() => setShowDatePicker(true)}
+              activeOpacity={0.7}
+            >
+              <Ionicons name={Icons.calendar} size={18} color={Colors.textMuted} />
+              <Text style={styles.fieldInputText}>
+                {date.toLocaleDateString(undefined, { year: 'numeric', month: 'short', day: 'numeric' })}
+              </Text>
+            </TouchableOpacity>
+            <View style={styles.fieldSeparator} />
             <View style={styles.field}>
               <Ionicons name={Icons.edit} size={18} color={Colors.textMuted} />
               <TextInput
@@ -191,6 +205,19 @@ export default function AddTransactionScreen() {
               <Text style={styles.saveBtnText}>{isLoading ? 'Saving…' : 'Save Transaction'}</Text>
             </LinearGradient>
           </TouchableOpacity>
+
+          {/* Date Picker */}
+          {showDatePicker && (
+            <DateTimePicker
+              value={date}
+              mode="date"
+              display="default"
+              onChange={(event, selectedDate) => {
+                setShowDatePicker(Platform.OS === 'ios');
+                if (selectedDate) setDate(selectedDate);
+              }}
+            />
+          )}
 
         </ScrollView>
       </KeyboardAvoidingView>
@@ -265,6 +292,7 @@ const styles = StyleSheet.create({
   },
   field: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: Spacing.md, gap: 12 },
   fieldInput: { flex: 1, height: 52, color: Colors.textPrimary, fontSize: 15 },
+  fieldInputText: { flex: 1, color: Colors.textPrimary, fontSize: 15 },
   fieldSeparator: { height: 1, backgroundColor: Colors.separator, marginLeft: 46 },
 
   // Save
