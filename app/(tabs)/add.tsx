@@ -2,7 +2,7 @@ import React, { useState } from 'react';
 import {
   StyleSheet, Text, View, TextInput,
   TouchableOpacity, Alert, KeyboardAvoidingView,
-  Platform, ScrollView,
+  Platform, ScrollView, Switch,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
@@ -13,30 +13,58 @@ import { Ionicons } from '@expo/vector-icons';
 import { Colors, Gradients, Spacing, Radius } from '@/constants/Theme';
 import { Icons } from '@/constants/Icons';
 import DateTimePicker from '@react-native-community/datetimepicker';
-
-const QUICK_CATEGORIES = {
-  expense: ['Food', 'Transport', 'Shopping', 'Bills', 'Health'],
-  income: ['Salary', 'Freelance', 'Business', 'Investment', 'Gift'],
-};
+import {
+  EXPENSE_CATEGORIES, EXPENSE_TYPES, EXPENSE_FREQUENCIES,
+  INCOME_TYPES, INCOME_FREQUENCIES,
+  type ExpenseType, type ExpenseFrequency,
+  type IncomeType, type IncomeFrequency,
+} from '@/utils/types';
 
 export default function AddTransactionScreen() {
   const { user } = useAuth();
   const router = useRouter();
-  const [type, setType] = useState<'expense' | 'income'>('expense');
+
+  // Common
+  const [mode, setMode] = useState<'expense' | 'income'>('expense');
   const [amount, setAmount] = useState('');
-  const [categoryName, setCategoryName] = useState('');
-  const [description, setDescription] = useState('');
   const [date, setDate] = useState(new Date());
   const [showDatePicker, setShowDatePicker] = useState(false);
+  const [description, setDescription] = useState('');
   const [isLoading, setIsLoading] = useState(false);
 
-  const isExpense = type === 'expense';
+  // Expense-specific
+  const [category, setCategory] = useState('');
+  const [expenseType, setExpenseType] = useState<ExpenseType>('variable');
+  const [expenseFrequency, setExpenseFrequency] = useState<ExpenseFrequency>('one-time');
+  const [isEssential, setIsEssential] = useState(false);
+
+  // Income-specific
+  const [incomeType, setIncomeType] = useState<IncomeType>('salary');
+  const [incomeFrequency, setIncomeFrequency] = useState<IncomeFrequency>('monthly');
+
+  const isExpense = mode === 'expense';
   const accentColor = isExpense ? Colors.danger : Colors.success;
   const gradColors = isExpense ? Gradients.expense : Gradients.income;
 
+  const resetForm = () => {
+    setAmount('');
+    setCategory('');
+    setDescription('');
+    setExpenseType('variable');
+    setExpenseFrequency('one-time');
+    setIsEssential(false);
+    setIncomeType('salary');
+    setIncomeFrequency('monthly');
+    setDate(new Date());
+  };
+
   const handleSave = async () => {
-    if (!amount || !categoryName) {
-      Alert.alert('Missing Fields', 'Please enter an amount and category.');
+    if (!amount) {
+      Alert.alert('Missing Amount', 'Please enter an amount.');
+      return;
+    }
+    if (isExpense && !category) {
+      Alert.alert('Missing Category', 'Please select or enter a category.');
       return;
     }
     const parsed = parseFloat(amount);
@@ -47,45 +75,31 @@ export default function AddTransactionScreen() {
 
     setIsLoading(true);
     try {
-      // Upsert category
-      const { data: existingCats } = await supabase
-        .from('categories')
-        .select('id')
-        .eq('user_id', user?.id)
-        .eq('name', categoryName.trim())
-        .eq('type', type)
-        .limit(1);
-
-      let categoryId: string;
-      if (existingCats && existingCats.length > 0) {
-        categoryId = existingCats[0].id;
+      if (isExpense) {
+        const { error } = await supabase.from('expenses').insert({
+          user_id: user?.id,
+          amount: parsed,
+          category: category.trim(),
+          type: expenseType,
+          frequency: expenseFrequency,
+          start_date: date.toISOString().split('T')[0],
+          is_essential: isEssential,
+          description: description.trim() || null,
+        });
+        if (error) throw error;
       } else {
-        const { data: newCat, error: catError } = await supabase
-          .from('categories')
-          .insert({
-            user_id: user?.id,
-            name: categoryName.trim(),
-            type,
-            icon: isExpense ? Icons.cart : Icons.cash,
-            color: accentColor,
-          })
-          .select('id')
-          .single();
-        if (catError) throw catError;
-        categoryId = newCat.id;
+        const { error } = await supabase.from('income').insert({
+          user_id: user?.id,
+          amount: parsed,
+          type: incomeType,
+          frequency: incomeFrequency,
+          start_date: date.toISOString().split('T')[0],
+          description: description.trim() || null,
+        });
+        if (error) throw error;
       }
 
-      const { error: txError } = await supabase.from('transactions').insert({
-        user_id: user?.id,
-        category_id: categoryId,
-        amount: parsed,
-        description: description.trim(),
-        type,
-        date: date.toISOString().split('T')[0],
-      });
-      if (txError) throw txError;
-
-      setAmount(''); setCategoryName(''); setDescription('');
+      resetForm();
       router.replace('/(tabs)');
     } catch (e: any) {
       Alert.alert('Error', e.message);
@@ -104,16 +118,16 @@ export default function AddTransactionScreen() {
           {/* Screen Title */}
           <Text style={styles.pageTitle}>New Transaction</Text>
 
-          {/* Type Toggle */}
+          {/* Mode Toggle */}
           <View style={styles.typeRow}>
             {(['expense', 'income'] as const).map((t) => {
-              const active = type === t;
+              const active = mode === t;
               const color = t === 'expense' ? Colors.danger : Colors.success;
               return (
                 <TouchableOpacity
                   key={t}
                   style={[styles.typeBtn, active && { backgroundColor: color, borderColor: color }]}
-                  onPress={() => { setType(t); setCategoryName(''); }}
+                  onPress={() => { setMode(t); setCategory(''); }}
                   activeOpacity={0.8}
                 >
                   <Ionicons
@@ -142,41 +156,145 @@ export default function AddTransactionScreen() {
             />
           </LinearGradient>
 
-          {/* Quick Category Pills */}
-          <Text style={styles.label}>Category</Text>
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.pillRow}>
-            {QUICK_CATEGORIES[type].map((cat) => (
-              <TouchableOpacity
-                key={cat}
-                style={[
-                  styles.pill,
-                  categoryName === cat && { backgroundColor: accentColor, borderColor: accentColor },
-                ]}
-                onPress={() => setCategoryName(cat)}
-                activeOpacity={0.75}
-              >
-                <Text style={[styles.pillText, categoryName === cat && { color: '#fff' }]}>
-                  {cat}
-                </Text>
-              </TouchableOpacity>
-            ))}
-          </ScrollView>
+          {/* ─── EXPENSE FIELDS ─── */}
+          {isExpense && (
+            <>
+              {/* Category Pills */}
+              <Text style={styles.label}>Category</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.pillRow}>
+                {EXPENSE_CATEGORIES.map((cat) => (
+                  <TouchableOpacity
+                    key={cat}
+                    style={[styles.pill, category === cat && { backgroundColor: accentColor, borderColor: accentColor }]}
+                    onPress={() => setCategory(cat)}
+                    activeOpacity={0.75}
+                  >
+                    <Text style={[styles.pillText, category === cat && { color: '#fff' }]}>{cat}</Text>
+                  </TouchableOpacity>
+                ))}
+              </ScrollView>
 
-          {/* Inputs */}
+              {/* Custom Category */}
+              <View style={styles.fieldGroup}>
+                <View style={styles.field}>
+                  <Ionicons name={Icons.tag} size={18} color={Colors.textMuted} />
+                  <TextInput
+                    style={styles.fieldInput}
+                    placeholder="Custom category…"
+                    placeholderTextColor={Colors.textMuted}
+                    value={category}
+                    onChangeText={setCategory}
+                  />
+                </View>
+              </View>
+
+              {/* Type: Fixed / Variable */}
+              <Text style={styles.label}>Type</Text>
+              <View style={styles.typeRow}>
+                {EXPENSE_TYPES.map((t) => {
+                  const active = expenseType === t;
+                  const icon = t === 'fixed' ? Icons.fixed : Icons.variable;
+                  return (
+                    <TouchableOpacity
+                      key={t}
+                      style={[styles.metaBtn, active && { backgroundColor: Colors.primary, borderColor: Colors.primary }]}
+                      onPress={() => setExpenseType(t)}
+                      activeOpacity={0.8}
+                    >
+                      <Ionicons name={icon} size={16} color={active ? '#fff' : Colors.textMuted} />
+                      <Text style={[styles.metaBtnLabel, active && { color: '#fff' }]}>
+                        {t.charAt(0).toUpperCase() + t.slice(1)}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </View>
+
+              {/* Frequency */}
+              <Text style={styles.label}>Frequency</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.pillRow}>
+                {EXPENSE_FREQUENCIES.map((f) => {
+                  const active = expenseFrequency === f;
+                  return (
+                    <TouchableOpacity
+                      key={f}
+                      style={[styles.pill, active && { backgroundColor: Colors.primary, borderColor: Colors.primary }]}
+                      onPress={() => setExpenseFrequency(f)}
+                      activeOpacity={0.75}
+                    >
+                      <Text style={[styles.pillText, active && { color: '#fff' }]}>
+                        {f.charAt(0).toUpperCase() + f.slice(1)}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+
+              {/* Essential Toggle */}
+              <View style={styles.toggleRow}>
+                <View style={styles.toggleLeft}>
+                  <Ionicons name={Icons.essential} size={18} color={isEssential ? Colors.success : Colors.textMuted} />
+                  <Text style={styles.toggleLabel}>Essential Expense</Text>
+                </View>
+                <Switch
+                  value={isEssential}
+                  onValueChange={setIsEssential}
+                  trackColor={{ false: Colors.card, true: `${Colors.success}66` }}
+                  thumbColor={isEssential ? Colors.success : Colors.textMuted}
+                />
+              </View>
+            </>
+          )}
+
+          {/* ─── INCOME FIELDS ─── */}
+          {!isExpense && (
+            <>
+              {/* Income Type */}
+              <Text style={styles.label}>Income Type</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.pillRow}>
+                {INCOME_TYPES.map((t) => {
+                  const active = incomeType === t;
+                  return (
+                    <TouchableOpacity
+                      key={t}
+                      style={[styles.pill, active && { backgroundColor: accentColor, borderColor: accentColor }]}
+                      onPress={() => setIncomeType(t)}
+                      activeOpacity={0.75}
+                    >
+                      <Text style={[styles.pillText, active && { color: '#fff' }]}>
+                        {t.charAt(0).toUpperCase() + t.slice(1)}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+
+              {/* Income Frequency */}
+              <Text style={styles.label}>Frequency</Text>
+              <ScrollView horizontal showsHorizontalScrollIndicator={false} style={styles.pillRow}>
+                {INCOME_FREQUENCIES.map((f) => {
+                  const active = incomeFrequency === f;
+                  return (
+                    <TouchableOpacity
+                      key={f}
+                      style={[styles.pill, active && { backgroundColor: Colors.primary, borderColor: Colors.primary }]}
+                      onPress={() => setIncomeFrequency(f)}
+                      activeOpacity={0.75}
+                    >
+                      <Text style={[styles.pillText, active && { color: '#fff' }]}>
+                        {f.charAt(0).toUpperCase() + f.slice(1)}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </ScrollView>
+            </>
+          )}
+
+          {/* ─── COMMON FIELDS ─── */}
           <View style={styles.fieldGroup}>
-            <View style={styles.field}>
-              <Ionicons name={Icons.tag} size={18} color={Colors.textMuted} />
-              <TextInput
-                style={styles.fieldInput}
-                placeholder="Custom category…"
-                placeholderTextColor={Colors.textMuted}
-                value={categoryName}
-                onChangeText={setCategoryName}
-              />
-            </View>
-            <View style={styles.fieldSeparator} />
-            <TouchableOpacity 
-              style={[styles.field, { height: 52 }]} 
+            <TouchableOpacity
+              style={[styles.field, { height: 52 }]}
               onPress={() => setShowDatePicker(true)}
               activeOpacity={0.7}
             >
@@ -202,7 +320,7 @@ export default function AddTransactionScreen() {
           <TouchableOpacity onPress={handleSave} disabled={isLoading} activeOpacity={0.85}>
             <LinearGradient colors={gradColors} style={styles.saveBtn} start={{ x: 0, y: 0 }} end={{ x: 1, y: 0 }}>
               <Ionicons name={isLoading ? Icons.loading : Icons.success} size={22} color="#fff" />
-              <Text style={styles.saveBtnText}>{isLoading ? 'Saving…' : 'Save Transaction'}</Text>
+              <Text style={styles.saveBtnText}>{isLoading ? 'Saving…' : `Save ${isExpense ? 'Expense' : 'Income'}`}</Text>
             </LinearGradient>
           </TouchableOpacity>
 
@@ -212,6 +330,7 @@ export default function AddTransactionScreen() {
               value={date}
               mode="date"
               display="default"
+              maximumDate={new Date()}
               onChange={(event, selectedDate) => {
                 setShowDatePicker(Platform.OS === 'ios');
                 if (selectedDate) setDate(selectedDate);
@@ -225,12 +344,14 @@ export default function AddTransactionScreen() {
   );
 }
 
+/* ─── Styles ──────────────────────────────────── */
+
 const styles = StyleSheet.create({
   container: { flex: 1, backgroundColor: Colors.bg },
-  scroll: { padding: Spacing.lg, paddingTop: Spacing.md, paddingBottom: 40, gap: Spacing.lg },
+  scroll: { padding: Spacing.lg, paddingTop: Spacing.md, paddingBottom: 40, gap: 14 },
   pageTitle: { fontSize: 26, fontWeight: '800', color: Colors.textPrimary, letterSpacing: -0.3 },
 
-  // Type toggle
+  // Mode toggle
   typeRow: { flexDirection: 'row', gap: 12 },
   typeBtn: {
     flex: 1,
@@ -268,8 +389,10 @@ const styles = StyleSheet.create({
     letterSpacing: -1,
   },
 
+  // Labels
+  label: { fontSize: 13, fontWeight: '600', color: Colors.textSecondary, letterSpacing: 0.5, marginTop: 4 },
+
   // Pills
-  label: { fontSize: 13, fontWeight: '600', color: Colors.textSecondary, letterSpacing: 0.5 },
   pillRow: { marginHorizontal: -Spacing.lg, paddingHorizontal: Spacing.lg },
   pill: {
     paddingHorizontal: 16,
@@ -281,6 +404,35 @@ const styles = StyleSheet.create({
     marginRight: 8,
   },
   pillText: { fontSize: 13, fontWeight: '600', color: Colors.textSecondary },
+
+  // Meta buttons (Fixed / Variable)
+  metaBtn: {
+    flex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+    paddingVertical: 10,
+    borderRadius: Radius.md,
+    borderWidth: 1.5,
+    borderColor: Colors.cardBorder,
+    backgroundColor: Colors.card,
+  },
+  metaBtnLabel: { fontSize: 14, fontWeight: '600', color: Colors.textMuted },
+
+  // Toggle row
+  toggleRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    backgroundColor: Colors.card,
+    borderRadius: Radius.lg,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    padding: Spacing.md,
+  },
+  toggleLeft: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+  toggleLabel: { fontSize: 15, fontWeight: '600', color: Colors.textPrimary },
 
   // Input fields
   fieldGroup: {

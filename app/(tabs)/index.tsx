@@ -1,4 +1,4 @@
-import React, { useEffect, useState } from 'react';
+import React, { useEffect, useState, useCallback } from 'react';
 import {
   StyleSheet, Text, View, ScrollView,
   RefreshControl, TouchableOpacity, Image
@@ -11,59 +11,132 @@ import { useAuth } from '@/hooks/useAuth';
 import { Colors, Gradients, Spacing, Radius } from '@/constants/Theme';
 import { formatCurrency } from '@/utils/currency';
 import { Icons } from '@/constants/Icons';
-
-type Transaction = {
-  id: string;
-  amount: number;
-  type: 'income' | 'expense';
-  description: string;
-  date: string;
-  categories: { name: string; icon: string; color: string } | null;
-};
-
 import { useRouter } from 'expo-router';
+import type { TimeFilter, UnifiedEntry, Expense, Income } from '@/utils/types';
+
+const MONTHS = [
+  'January', 'February', 'March', 'April', 'May', 'June',
+  'July', 'August', 'September', 'October', 'November', 'December',
+];
+
+const TIME_FILTERS: { key: TimeFilter; label: string }[] = [
+  { key: 'month', label: 'Monthly' },
+  { key: 'year', label: 'Yearly' },
+  { key: 'all', label: 'All Time' },
+];
 
 export default function DashboardScreen() {
   const { user } = useAuth();
   const router = useRouter();
+
+  // Filter state
+  const [timeFilter, setTimeFilter] = useState<TimeFilter>('month');
+  const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());   // 0-11
+  const [selectedYear, setSelectedYear] = useState(new Date().getFullYear());
+
+  // Data
   const [balance, setBalance] = useState(0);
-  const [income, setIncome] = useState(0);
-  const [expense, setExpense] = useState(0);
-  const [recentTransactions, setRecentTransactions] = useState<Transaction[]>([]);
+  const [totalIncome, setTotalIncome] = useState(0);
+  const [totalExpense, setTotalExpense] = useState(0);
+  const [recentEntries, setRecentEntries] = useState<UnifiedEntry[]>([]);
   const [refreshing, setRefreshing] = useState(false);
 
-  const fetchData = async () => {
+  const getDateRange = useCallback((): { start: string; end: string } | null => {
+    if (timeFilter === 'all') return null;
+
+    if (timeFilter === 'month') {
+      const start = new Date(selectedYear, selectedMonth, 1);
+      const end = new Date(selectedYear, selectedMonth + 1, 0); // last day of month
+      return {
+        start: start.toISOString().split('T')[0],
+        end: end.toISOString().split('T')[0],
+      };
+    }
+
+    // year
+    return {
+      start: `${selectedYear}-01-01`,
+      end: `${selectedYear}-12-31`,
+    };
+  }, [timeFilter, selectedMonth, selectedYear]);
+
+  const fetchData = useCallback(async () => {
     if (!user) return;
 
-    const [{ data: recent }, { data: all }] = await Promise.all([
-      supabase
-        .from('transactions')
-        .select('*, categories(name, icon, color)')
-        .eq('user_id', user.id)
-        .order('date', { ascending: false })
-        .order('created_at', { ascending: false })
-        .limit(5),
-      supabase
-        .from('transactions')
-        .select('amount, type')
-        .eq('user_id', user.id),
-    ]);
+    const dateRange = getDateRange();
 
-    if (recent) setRecentTransactions(recent as Transaction[]);
-
-    if (all) {
-      let totalIncome = 0, totalExpense = 0;
-      all.forEach((t) => {
-        if (t.type === 'income') totalIncome += Number(t.amount);
-        else totalExpense += Number(t.amount);
-      });
-      setIncome(totalIncome);
-      setExpense(totalExpense);
-      setBalance(totalIncome - totalExpense);
+    // Build expense query
+    let expQ = supabase
+      .from('expenses')
+      .select('*')
+      .eq('user_id', user.id);
+    if (dateRange) {
+      expQ = expQ.gte('start_date', dateRange.start).lte('start_date', dateRange.end);
     }
-  };
 
-  useEffect(() => { fetchData(); }, [user]);
+    // Build income query
+    let incQ = supabase
+      .from('income')
+      .select('*')
+      .eq('user_id', user.id);
+    if (dateRange) {
+      incQ = incQ.gte('start_date', dateRange.start).lte('start_date', dateRange.end);
+    }
+
+    const [{ data: expenses }, { data: incomes }] = await Promise.all([expQ, incQ]);
+
+    // Calculate totals
+    let incSum = 0, expSum = 0;
+    const unified: UnifiedEntry[] = [];
+
+    if (incomes) {
+      (incomes as Income[]).forEach((i) => {
+        incSum += Number(i.amount);
+        unified.push({
+          id: i.id,
+          amount: Number(i.amount),
+          kind: 'income',
+          label: i.type.charAt(0).toUpperCase() + i.type.slice(1),
+          date: i.start_date,
+          description: i.description,
+          frequency: i.frequency,
+          created_at: i.created_at,
+        });
+      });
+    }
+
+    if (expenses) {
+      (expenses as Expense[]).forEach((e) => {
+        expSum += Number(e.amount);
+        unified.push({
+          id: e.id,
+          amount: Number(e.amount),
+          kind: 'expense',
+          label: e.category,
+          date: e.start_date,
+          description: e.description,
+          frequency: e.frequency,
+          expenseType: e.type,
+          isEssential: e.is_essential,
+          created_at: e.created_at,
+        });
+      });
+    }
+
+    // Sort by date desc, then created_at desc
+    unified.sort((a, b) => {
+      const d = b.date.localeCompare(a.date);
+      if (d !== 0) return d;
+      return b.created_at.localeCompare(a.created_at);
+    });
+
+    setTotalIncome(incSum);
+    setTotalExpense(expSum);
+    setBalance(incSum - expSum);
+    setRecentEntries(unified.slice(0, 7));
+  }, [user, getDateRange]);
+
+  useEffect(() => { fetchData(); }, [fetchData]);
 
   const onRefresh = async () => {
     setRefreshing(true);
@@ -71,7 +144,32 @@ export default function DashboardScreen() {
     setRefreshing(false);
   };
 
+  const now = new Date();
+  const isCurrentMonth = selectedMonth === now.getMonth() && selectedYear === now.getFullYear();
+  const isCurrentYear = selectedYear === now.getFullYear();
+  const canGoForward = timeFilter === 'month' ? !isCurrentMonth : !isCurrentYear;
+
+  const navigateMonth = (dir: -1 | 1) => {
+    if (dir === 1 && isCurrentMonth) return;
+    let newMonth = selectedMonth + dir;
+    let newYear = selectedYear;
+    if (newMonth < 0) { newMonth = 11; newYear--; }
+    if (newMonth > 11) { newMonth = 0; newYear++; }
+    setSelectedMonth(newMonth);
+    setSelectedYear(newYear);
+  };
+
+  const navigateYear = (dir: -1 | 1) => {
+    if (dir === 1 && isCurrentYear) return;
+    setSelectedYear((y) => y + dir);
+  };
+
   const firstName = user?.user_metadata?.full_name?.split(' ')[0] || 'there';
+  const filterLabel = timeFilter === 'month'
+    ? `${MONTHS[selectedMonth]} ${selectedYear}`
+    : timeFilter === 'year'
+    ? `${selectedYear}`
+    : 'All Time';
 
   return (
     <SafeAreaView style={styles.container}>
@@ -98,6 +196,47 @@ export default function DashboardScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />
         }
       >
+        {/* ─── Time Filter Bar ─── */}
+        <View style={styles.filterBar}>
+          {TIME_FILTERS.map(({ key, label }) => {
+            const active = timeFilter === key;
+            return (
+              <TouchableOpacity
+                key={key}
+                style={[styles.filterPill, active && styles.filterPillActive]}
+                onPress={() => setTimeFilter(key)}
+                activeOpacity={0.75}
+              >
+                <Text style={[styles.filterPillText, active && styles.filterPillTextActive]}>
+                  {label}
+                </Text>
+              </TouchableOpacity>
+            );
+          })}
+        </View>
+
+        {/* ─── Period Navigator ─── */}
+        {timeFilter !== 'all' && (
+          <View style={styles.periodNav}>
+            <TouchableOpacity
+              onPress={() => timeFilter === 'month' ? navigateMonth(-1) : navigateYear(-1)}
+              style={styles.periodArrow}
+              activeOpacity={0.7}
+            >
+              <Ionicons name={Icons.chevronBack} size={20} color={Colors.textSecondary} />
+            </TouchableOpacity>
+            <Text style={styles.periodLabel}>{filterLabel}</Text>
+            <TouchableOpacity
+              onPress={() => timeFilter === 'month' ? navigateMonth(1) : navigateYear(1)}
+              style={[styles.periodArrow, !canGoForward && { opacity: 0.3 }]}
+              activeOpacity={0.7}
+              disabled={!canGoForward}
+            >
+              <Ionicons name={Icons.chevronForward} size={20} color={Colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+        )}
+
         {/* Balance Card */}
         <LinearGradient
           colors={Gradients.balanceCard}
@@ -105,35 +244,41 @@ export default function DashboardScreen() {
           end={{ x: 1, y: 1 }}
           style={styles.balanceCard}
         >
-          {/* Decorative glow */}
           <View style={styles.cardGlow} />
 
-          <Text style={styles.balanceLabel}>Total Balance</Text>
+          <Text style={styles.balanceLabel}>
+            {timeFilter === 'all' ? 'Total Balance' : `Balance · ${filterLabel}`}
+          </Text>
           <Text style={styles.balanceAmount}>
             {formatCurrency(balance, 2)}
           </Text>
 
           <View style={styles.statsRow}>
-            <StatBox label="Income" amount={income} color={Colors.success} icon={Icons.income} />
+            <StatBox label="Income" amount={totalIncome} color={Colors.success} icon={Icons.income} />
             <View style={styles.statDivider} />
-            <StatBox label="Expenses" amount={expense} color={Colors.danger} icon={Icons.expense} />
+            <StatBox label="Expenses" amount={totalExpense} color={Colors.danger} icon={Icons.expense} />
           </View>
         </LinearGradient>
 
         {/* Recent Transactions */}
         <View style={styles.sectionRow}>
-          <Text style={styles.sectionTitle}>Recent Transactions</Text>
+          <Text style={styles.sectionTitle}>Recent Entries</Text>
+          <Text style={styles.sectionCount}>{recentEntries.length}</Text>
         </View>
 
-        {recentTransactions.length === 0 ? (
+        {recentEntries.length === 0 ? (
           <View style={styles.empty}>
             <Ionicons name={Icons.emptyDashboard} size={48} color={Colors.textMuted} />
             <Text style={styles.emptyTitle}>All clear!</Text>
-            <Text style={styles.emptyBody}>Tap + to add your first transaction.</Text>
+            <Text style={styles.emptyBody}>
+              {timeFilter === 'all'
+                ? 'Tap + to add your first transaction.'
+                : `No entries in ${filterLabel}.`}
+            </Text>
           </View>
         ) : (
-          recentTransactions.map((tx) => (
-            <TransactionRow key={tx.id} tx={tx} />
+          recentEntries.map((entry) => (
+            <EntryRow key={entry.id} entry={entry} />
           ))
         )}
       </ScrollView>
@@ -161,31 +306,39 @@ function StatBox({ label, amount, color, icon }: {
   );
 }
 
-function TransactionRow({ tx }: { tx: Transaction }) {
-  const isIncome = tx.type === 'income';
-  const bgColor = tx.categories?.color || (isIncome ? Colors.success : Colors.danger);
+function EntryRow({ entry }: { entry: UnifiedEntry }) {
+  const isIncome = entry.kind === 'income';
+  const color = isIncome ? Colors.success : Colors.danger;
+  const icon = isIncome ? Icons.cash : Icons.cart;
 
   return (
     <View style={rowStyles.card}>
-      <View style={[rowStyles.iconWrap, { backgroundColor: `${bgColor}22` }]}>
-        <Ionicons
-          name={(tx.categories?.icon as any) || (isIncome ? Icons.cash : Icons.cart)}
-          size={20}
-          color={bgColor}
-        />
+      <View style={[rowStyles.iconWrap, { backgroundColor: `${color}22` }]}>
+        <Ionicons name={icon} size={20} color={color} />
       </View>
       <View style={rowStyles.details}>
         <Text style={rowStyles.title} numberOfLines={1}>
-          {tx.description || tx.categories?.name || 'Transaction'}
+          {entry.description || entry.label || 'Transaction'}
         </Text>
-        <Text style={rowStyles.meta}>
-          {tx.categories?.name}
-          {tx.categories?.name ? '  ·  ' : ''}
-          {tx.date}
-        </Text>
+        <View style={rowStyles.metaRow}>
+          <Text style={rowStyles.meta}>{entry.label}</Text>
+          {entry.frequency !== 'one-time' && (
+            <View style={rowStyles.freqBadge}>
+              <Text style={rowStyles.freqText}>{entry.frequency}</Text>
+            </View>
+          )}
+          {entry.expenseType && (
+            <View style={[rowStyles.freqBadge, entry.expenseType === 'fixed' && { backgroundColor: `${Colors.warning}22` }]}>
+              <Text style={[rowStyles.freqText, entry.expenseType === 'fixed' && { color: Colors.warning }]}>
+                {entry.expenseType}
+              </Text>
+            </View>
+          )}
+        </View>
+        <Text style={rowStyles.date}>{entry.date}</Text>
       </View>
-      <Text style={[rowStyles.amount, { color: isIncome ? Colors.success : Colors.danger }]}>
-        {isIncome ? '+' : '-'}{formatCurrency(tx.amount)}
+      <Text style={[rowStyles.amount, { color }]}>
+        {isIncome ? '+' : '-'}{formatCurrency(entry.amount)}
       </Text>
     </View>
   );
@@ -218,6 +371,62 @@ const styles = StyleSheet.create({
   subGreeting: { fontSize: 13, color: Colors.textSecondary, marginTop: 2 },
   avatarBtn: { padding: 4 },
   scroll: { padding: Spacing.lg, paddingBottom: 20 },
+
+  // Filter bar
+  filterBar: {
+    flexDirection: 'row',
+    gap: 8,
+    marginBottom: Spacing.sm,
+  },
+  filterPill: {
+    flex: 1,
+    paddingVertical: 10,
+    borderRadius: 30,
+    backgroundColor: Colors.card,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    alignItems: 'center',
+  },
+  filterPillActive: {
+    backgroundColor: Colors.primary,
+    borderColor: Colors.primary,
+  },
+  filterPillText: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: Colors.textMuted,
+  },
+  filterPillTextActive: {
+    color: '#fff',
+  },
+
+  // Period navigator
+  periodNav: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 16,
+    marginBottom: Spacing.md,
+  },
+  periodArrow: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: Colors.card,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  periodLabel: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+    minWidth: 140,
+    textAlign: 'center',
+  },
+
+  // Balance card
   balanceCard: {
     borderRadius: Radius.xl,
     padding: Spacing.lg,
@@ -248,11 +457,16 @@ const styles = StyleSheet.create({
     gap: Spacing.md,
   },
   statDivider: { width: 1, backgroundColor: 'rgba(255,255,255,0.12)' },
+
+  // Section
   sectionRow: { flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center', marginBottom: Spacing.md },
   sectionTitle: { fontSize: 17, fontWeight: '700', color: Colors.textPrimary },
+  sectionCount: { fontSize: 13, fontWeight: '600', color: Colors.textMuted },
+
+  // Empty
   empty: { alignItems: 'center', paddingVertical: 40, gap: 10 },
   emptyTitle: { fontSize: 18, fontWeight: '700', color: Colors.textSecondary },
-  emptyBody: { fontSize: 13, color: Colors.textMuted },
+  emptyBody: { fontSize: 13, color: Colors.textMuted, textAlign: 'center' },
 });
 
 const statStyles = StyleSheet.create({
@@ -277,6 +491,15 @@ const rowStyles = StyleSheet.create({
   iconWrap: { width: 44, height: 44, borderRadius: 22, alignItems: 'center', justifyContent: 'center' },
   details: { flex: 1 },
   title: { fontSize: 15, fontWeight: '600', color: Colors.textPrimary, marginBottom: 3 },
+  metaRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 2 },
   meta: { fontSize: 12, color: Colors.textSecondary },
+  freqBadge: {
+    paddingHorizontal: 6,
+    paddingVertical: 2,
+    borderRadius: 8,
+    backgroundColor: `${Colors.primary}22`,
+  },
+  freqText: { fontSize: 10, fontWeight: '700', color: Colors.primary },
+  date: { fontSize: 11, color: Colors.textMuted },
   amount: { fontSize: 15, fontWeight: '700' },
 });
