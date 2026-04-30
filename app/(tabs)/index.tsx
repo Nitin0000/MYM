@@ -1,7 +1,8 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   StyleSheet, Text, View, ScrollView,
-  RefreshControl, TouchableOpacity, Image
+  RefreshControl, TouchableOpacity, Image,
+  Modal, Pressable, Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
@@ -41,6 +42,8 @@ export default function DashboardScreen() {
   const [totalExpense, setTotalExpense] = useState(0);
   const [recentEntries, setRecentEntries] = useState<UnifiedEntry[]>([]);
   const [refreshing, setRefreshing] = useState(false);
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownAnim = useRef(new Animated.Value(0)).current;
 
   const getDateRange = useCallback((): { start: string; end: string } | null => {
     if (timeFilter === 'all') return null;
@@ -172,6 +175,22 @@ export default function DashboardScreen() {
     ? `${selectedYear}`
     : 'All Time';
 
+  const currentFilterName = TIME_FILTERS.find(f => f.key === timeFilter)?.label || 'Monthly';
+
+  const toggleDropdown = () => {
+    if (dropdownOpen) {
+      Animated.timing(dropdownAnim, { toValue: 0, duration: 180, useNativeDriver: false }).start(() => setDropdownOpen(false));
+    } else {
+      setDropdownOpen(true);
+      Animated.timing(dropdownAnim, { toValue: 1, duration: 180, useNativeDriver: false }).start();
+    }
+  };
+
+  const selectFilter = (key: TimeFilter) => {
+    setTimeFilter(key);
+    Animated.timing(dropdownAnim, { toValue: 0, duration: 150, useNativeDriver: false }).start(() => setDropdownOpen(false));
+  };
+
   return (
     <SafeAreaView style={styles.container}>
       <LinearGradient colors={Gradients.background} style={StyleSheet.absoluteFillObject} />
@@ -197,45 +216,97 @@ export default function DashboardScreen() {
           <RefreshControl refreshing={refreshing} onRefresh={onRefresh} tintColor={Colors.primary} />
         }
       >
-        {/* ─── Time Filter Bar ─── */}
-        <View style={styles.filterBar}>
-          {TIME_FILTERS.map(({ key, label }) => {
-            const active = timeFilter === key;
-            return (
-              <TouchableOpacity
-                key={key}
-                style={[styles.filterPill, active && styles.filterPillActive]}
-                onPress={() => setTimeFilter(key)}
-                activeOpacity={0.75}
+        {/* ─── Filter Row: Dropdown + Period Navigator ─── */}
+        <View style={styles.filterRow}>
+          {/* Dropdown Trigger */}
+          <View style={{ position: 'relative', zIndex: 10 }}>
+            <TouchableOpacity
+              style={styles.dropdownTrigger}
+              onPress={toggleDropdown}
+              activeOpacity={0.8}
+            >
+              <Ionicons name={Icons.filter} size={16} color={Colors.primary} />
+              <Text style={styles.dropdownTriggerText}>{currentFilterName}</Text>
+              <Ionicons
+                name={dropdownOpen ? 'chevron-up' : 'chevron-down'}
+                size={14}
+                color={Colors.textSecondary}
+              />
+            </TouchableOpacity>
+
+            {/* Dropdown Menu */}
+            {dropdownOpen && (
+              <Animated.View
+                style={[
+                  styles.dropdownMenu,
+                  {
+                    opacity: dropdownAnim,
+                    transform: [
+                      {
+                        translateY: dropdownAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [-8, 0],
+                        }),
+                      },
+                    ],
+                  },
+                ]}
               >
-                <Text style={[styles.filterPillText, active && styles.filterPillTextActive]}>
-                  {label}
-                </Text>
+                {TIME_FILTERS.map(({ key, label }) => {
+                  const active = timeFilter === key;
+                  return (
+                    <TouchableOpacity
+                      key={key}
+                      style={[styles.dropdownItem, active && styles.dropdownItemActive]}
+                      onPress={() => selectFilter(key)}
+                      activeOpacity={0.7}
+                    >
+                      {active && (
+                        <Ionicons name="checkmark" size={16} color={Colors.primary} style={{ marginRight: 6 }} />
+                      )}
+                      <Text
+                        style={[styles.dropdownItemText, active && styles.dropdownItemTextActive]}
+                      >
+                        {label}
+                      </Text>
+                    </TouchableOpacity>
+                  );
+                })}
+              </Animated.View>
+            )}
+          </View>
+
+          {/* Period Navigator (right side) */}
+          {timeFilter !== 'all' ? (
+            <View style={styles.periodNav}>
+              <TouchableOpacity
+                onPress={() => timeFilter === 'month' ? navigateMonth(-1) : navigateYear(-1)}
+                style={styles.periodArrow}
+                activeOpacity={0.7}
+              >
+                <Ionicons name={Icons.chevronBack} size={18} color={Colors.textSecondary} />
               </TouchableOpacity>
-            );
-          })}
+              <Text style={styles.periodLabel}>{filterLabel}</Text>
+              <TouchableOpacity
+                onPress={() => timeFilter === 'month' ? navigateMonth(1) : navigateYear(1)}
+                style={[styles.periodArrow, !canGoForward && { opacity: 0.3 }]}
+                activeOpacity={0.7}
+                disabled={!canGoForward}
+              >
+                <Ionicons name={Icons.chevronForward} size={18} color={Colors.textSecondary} />
+              </TouchableOpacity>
+            </View>
+          ) : (
+            <Text style={styles.allTimeLabel}>All Time</Text>
+          )}
         </View>
 
-        {/* ─── Period Navigator ─── */}
-        {timeFilter !== 'all' && (
-          <View style={styles.periodNav}>
-            <TouchableOpacity
-              onPress={() => timeFilter === 'month' ? navigateMonth(-1) : navigateYear(-1)}
-              style={styles.periodArrow}
-              activeOpacity={0.7}
-            >
-              <Ionicons name={Icons.chevronBack} size={20} color={Colors.textSecondary} />
-            </TouchableOpacity>
-            <Text style={styles.periodLabel}>{filterLabel}</Text>
-            <TouchableOpacity
-              onPress={() => timeFilter === 'month' ? navigateMonth(1) : navigateYear(1)}
-              style={[styles.periodArrow, !canGoForward && { opacity: 0.3 }]}
-              activeOpacity={0.7}
-              disabled={!canGoForward}
-            >
-              <Ionicons name={Icons.chevronForward} size={20} color={Colors.textSecondary} />
-            </TouchableOpacity>
-          </View>
+        {/* Close dropdown when tapping outside */}
+        {dropdownOpen && (
+          <Pressable
+            style={StyleSheet.absoluteFillObject}
+            onPress={toggleDropdown}
+          />
         )}
 
         {/* Balance Card */}
@@ -381,46 +452,84 @@ const styles = StyleSheet.create({
   avatarBtn: { padding: 4 },
   scroll: { padding: Spacing.lg, paddingBottom: 20 },
 
-  // Filter bar
-  filterBar: {
+  // Filter row (dropdown + period nav in one line)
+  filterRow: {
     flexDirection: 'row',
-    gap: 8,
-    marginBottom: Spacing.sm,
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    marginBottom: Spacing.md,
+    zIndex: 10,
   },
-  filterPill: {
-    flex: 1,
-    paddingVertical: 10,
-    borderRadius: 30,
+
+  // Dropdown
+  dropdownTrigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
     backgroundColor: Colors.card,
     borderWidth: 1,
     borderColor: Colors.cardBorder,
-    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 14,
   },
-  filterPillActive: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
-  },
-  filterPillText: {
-    fontSize: 13,
+  dropdownTriggerText: {
+    fontSize: 14,
     fontWeight: '700',
-    color: Colors.textMuted,
+    color: Colors.textPrimary,
   },
-  filterPillTextActive: {
-    color: '#fff',
+  dropdownMenu: {
+    position: 'absolute',
+    top: '100%',
+    left: 0,
+    marginTop: 6,
+    minWidth: 150,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    borderRadius: 14,
+    paddingVertical: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 12,
+  },
+  dropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+  },
+  dropdownItemActive: {
+    backgroundColor: `${Colors.primary}18`,
+  },
+  dropdownItemText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.textSecondary,
+  },
+  dropdownItemTextActive: {
+    color: Colors.primary,
+    fontWeight: '700',
+  },
+  allTimeLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.textMuted,
+    fontStyle: 'italic',
   },
 
-  // Period navigator
+  // Period navigator (inline, right side)
   periodNav: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 16,
-    marginBottom: Spacing.md,
+    gap: 10,
   },
   periodArrow: {
-    width: 36,
-    height: 36,
-    borderRadius: 18,
+    width: 32,
+    height: 32,
+    borderRadius: 16,
     backgroundColor: Colors.card,
     borderWidth: 1,
     borderColor: Colors.cardBorder,
@@ -428,10 +537,10 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   periodLabel: {
-    fontSize: 16,
+    fontSize: 14,
     fontWeight: '700',
     color: Colors.textPrimary,
-    minWidth: 140,
+    minWidth: 100,
     textAlign: 'center',
   },
 
