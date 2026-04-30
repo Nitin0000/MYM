@@ -24,6 +24,7 @@ export type Expense = {
   is_essential: boolean;
   description: string | null;
   created_at: string;
+  deleted_at: string | null;
 };
 
 // Income types
@@ -43,6 +44,7 @@ export type Income = {
   end_date: string | null;
   description: string | null;
   created_at: string;
+  deleted_at: string | null;
 };
 
 // Unified entry (for combined lists)
@@ -56,6 +58,7 @@ export type UnifiedEntry = {
   frequency: string;
   expenseType?: ExpenseType;  // only for expenses
   isEssential?: boolean;      // only for expenses
+  endDate?: string | null;    // end date for recurring entries
   created_at: string;
 };
 

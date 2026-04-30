@@ -2,7 +2,7 @@ import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   StyleSheet, Text, View, FlatList,
   ActivityIndicator, TouchableOpacity,
-  Pressable, Animated,
+  Pressable, Animated, Modal, TextInput, Alert,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
@@ -37,6 +37,22 @@ export default function TransactionsScreen() {
   const [kindDropdownOpen, setKindDropdownOpen] = useState(false);
   const kindDropdownAnim = useRef(new Animated.Value(0)).current;
 
+  // Action sheet state (long press)
+  const [actionTarget, setActionTarget] = useState<UnifiedEntry | null>(null);
+  const [actionModalVisible, setActionModalVisible] = useState(false);
+
+  // Delete confirmation state
+  const [deleteTarget, setDeleteTarget] = useState<UnifiedEntry | null>(null);
+  const [deleteModalVisible, setDeleteModalVisible] = useState(false);
+  const [deleteInput, setDeleteInput] = useState('');
+  const [deleting, setDeleting] = useState(false);
+
+  // End recurring entry state
+  const [endTarget, setEndTarget] = useState<UnifiedEntry | null>(null);
+  const [endModalVisible, setEndModalVisible] = useState(false);
+  const [ending, setEnding] = useState(false);
+  const [endDateInput, setEndDateInput] = useState('');
+
   // Time filter
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('month');
   const [selectedMonth, setSelectedMonth] = useState(new Date().getMonth());
@@ -58,8 +74,8 @@ export default function TransactionsScreen() {
 
     const dateRange = getDateRange();
 
-    let expQ = supabase.from('expenses').select('*').eq('user_id', user.id);
-    let incQ = supabase.from('income').select('*').eq('user_id', user.id);
+    let expQ = supabase.from('expenses').select('*').eq('user_id', user.id).is('deleted_at', null);
+    let incQ = supabase.from('income').select('*').eq('user_id', user.id).is('deleted_at', null);
 
     if (dateRange) {
       expQ = expQ.gte('start_date', dateRange.start).lte('start_date', dateRange.end);
@@ -80,6 +96,7 @@ export default function TransactionsScreen() {
           date: i.start_date,
           description: i.description,
           frequency: i.frequency,
+          endDate: i.end_date,
           created_at: i.created_at,
         });
       });
@@ -97,6 +114,7 @@ export default function TransactionsScreen() {
           frequency: e.frequency,
           expenseType: e.type,
           isEssential: e.is_essential,
+          endDate: e.end_date,
           created_at: e.created_at,
         });
       });
@@ -182,12 +200,97 @@ export default function TransactionsScreen() {
     Animated.timing(kindDropdownAnim, { toValue: 0, duration: 150, useNativeDriver: false }).start(() => setKindDropdownOpen(false));
   };
 
+  // ─── Action sheet (long press) ───
+  const isRecurring = (freq: string) => freq !== 'one-time';
+
+  const openActionModal = (item: UnifiedEntry) => {
+    setActionTarget(item);
+    setActionModalVisible(true);
+  };
+
+  const closeActionModal = () => {
+    setActionModalVisible(false);
+    setActionTarget(null);
+  };
+
+  const chooseDelete = () => {
+    if (!actionTarget) return;
+    closeActionModal();
+    setTimeout(() => {
+      setDeleteTarget(actionTarget);
+      setDeleteInput('');
+      setDeleteModalVisible(true);
+    }, 250);
+  };
+
+  const chooseEnd = () => {
+    if (!actionTarget) return;
+    closeActionModal();
+    setTimeout(() => {
+      setEndTarget(actionTarget);
+      setEndDateInput(new Date().toISOString().split('T')[0]);
+      setEndModalVisible(true);
+    }, 250);
+  };
+
+  // ─── Delete handlers ───
+  const closeDeleteModal = () => {
+    setDeleteModalVisible(false);
+    setDeleteTarget(null);
+    setDeleteInput('');
+  };
+
+  const confirmDelete = async () => {
+    if (!deleteTarget || deleteInput.toLowerCase() !== 'delete') return;
+    setDeleting(true);
+    const table = deleteTarget.kind === 'income' ? 'income' : 'expenses';
+    const { error } = await supabase
+      .from(table)
+      .update({ deleted_at: new Date().toISOString() })
+      .eq('id', deleteTarget.id);
+    setDeleting(false);
+    if (error) { Alert.alert('Error', 'Failed to delete entry.'); return; }
+    closeDeleteModal();
+    fetchData();
+  };
+
+  // ─── End recurring handlers ───
+  const closeEndModal = () => {
+    setEndModalVisible(false);
+    setEndTarget(null);
+    setEndDateInput('');
+  };
+
+  const isEndDateValid = () => {
+    if (!endTarget || !endDateInput) return false;
+    return endDateInput >= endTarget.date;
+  };
+
+  const confirmEnd = async () => {
+    if (!endTarget || !isEndDateValid()) return;
+    setEnding(true);
+    const table = endTarget.kind === 'income' ? 'income' : 'expenses';
+    const { error } = await supabase
+      .from(table)
+      .update({ end_date: endDateInput })
+      .eq('id', endTarget.id);
+    setEnding(false);
+    if (error) { Alert.alert('Error', 'Failed to end entry.'); return; }
+    closeEndModal();
+    fetchData();
+  };
+
   const renderItem = ({ item }: { item: UnifiedEntry }) => {
     const isIncome = item.kind === 'income';
     const color = isIncome ? Colors.success : Colors.danger;
 
     return (
-      <View style={styles.card}>
+      <TouchableOpacity
+        style={styles.card}
+        onLongPress={() => openActionModal(item)}
+        activeOpacity={0.85}
+        delayLongPress={400}
+      >
         <View style={[styles.icon, { backgroundColor: `${color}22` }]}>
           <Ionicons name={isIncome ? Icons.cash : Icons.cart} size={22} color={color} />
         </View>
@@ -218,6 +321,15 @@ export default function TransactionsScreen() {
             )}
           </View>
           <Text style={styles.date}>{item.date}</Text>
+          {/* Show ended badge for recurring entries */}
+          {isRecurring(item.frequency) && item.endDate && (
+            <View style={styles.endRow}>
+              <View style={styles.endedBadge}>
+                <Ionicons name="checkmark-circle" size={12} color={Colors.textMuted} />
+                <Text style={styles.endedText}>Ended {item.endDate}</Text>
+              </View>
+            </View>
+          )}
         </View>
         <View style={styles.right}>
           <CompactAmount
@@ -232,7 +344,7 @@ export default function TransactionsScreen() {
             </Text>
           </View>
         </View>
-      </View>
+      </TouchableOpacity>
     );
   };
 
@@ -432,6 +544,243 @@ export default function TransactionsScreen() {
           }
         />
       )}
+
+      {/* ─── Delete Confirmation Modal ─── */}
+      <Modal
+        visible={deleteModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={closeDeleteModal}
+      >
+        <Pressable style={styles.modalOverlay} onPress={closeDeleteModal}>
+          <Pressable style={styles.modalContent} onPress={() => {}}>
+            {/* Warning icon */}
+            <View style={styles.modalIconWrap}>
+              <Ionicons name="warning" size={32} color={Colors.danger} />
+            </View>
+
+            <Text style={styles.modalTitle}>Delete Entry</Text>
+
+            {deleteTarget && (
+              <View style={styles.modalEntry}>
+                <Text style={styles.modalEntryLabel}>
+                  {deleteTarget.description || deleteTarget.label}
+                </Text>
+                <Text style={[
+                  styles.modalEntryAmount,
+                  { color: deleteTarget.kind === 'income' ? Colors.success : Colors.danger },
+                ]}>
+                  {deleteTarget.kind === 'income' ? '+' : '-'}₹{deleteTarget.amount.toLocaleString('en-IN')}
+                </Text>
+              </View>
+            )}
+
+            <Text style={styles.modalDesc}>
+              This action will remove this entry from your records.{"\n"}
+              Type <Text style={styles.modalBold}>delete</Text> below to confirm.
+            </Text>
+
+            <TextInput
+              style={[
+                styles.modalInput,
+                deleteInput.toLowerCase() === 'delete' && styles.modalInputValid,
+              ]}
+              placeholder='Type "delete" to confirm'
+              placeholderTextColor={Colors.textMuted}
+              value={deleteInput}
+              onChangeText={setDeleteInput}
+              autoCapitalize="none"
+              autoCorrect={false}
+            />
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.modalCancelBtn}
+                onPress={closeDeleteModal}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[
+                  styles.modalDeleteBtn,
+                  deleteInput.toLowerCase() !== 'delete' && styles.modalDeleteBtnDisabled,
+                ]}
+                onPress={confirmDelete}
+                activeOpacity={0.7}
+                disabled={deleteInput.toLowerCase() !== 'delete' || deleting}
+              >
+                {deleting ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <>
+                    <Ionicons name="trash" size={16} color="#fff" />
+                    <Text style={styles.modalDeleteText}>Delete</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* ─── Action Sheet Modal (long press) ─── */}
+      <Modal
+        visible={actionModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={closeActionModal}
+      >
+        <Pressable style={styles.modalOverlay} onPress={closeActionModal}>
+          <Pressable style={styles.actionSheet} onPress={() => {}}>
+            {actionTarget && (
+              <View style={styles.actionSheetHeader}>
+                <Text style={styles.actionSheetTitle} numberOfLines={1}>
+                  {actionTarget.description || actionTarget.label}
+                </Text>
+                <Text style={styles.actionSheetSub}>
+                  {actionTarget.kind === 'income' ? 'Income' : 'Expense'} · {actionTarget.frequency}
+                </Text>
+              </View>
+            )}
+
+            {/* Delete option */}
+            <TouchableOpacity
+              style={styles.actionSheetOption}
+              onPress={chooseDelete}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.actionSheetIcon, { backgroundColor: `${Colors.danger}18` }]}>
+                <Ionicons name="trash" size={20} color={Colors.danger} />
+              </View>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.actionSheetOptionTitle}>Delete</Text>
+                <Text style={styles.actionSheetOptionSub}>Remove from records</Text>
+              </View>
+              <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
+            </TouchableOpacity>
+
+            {/* End option — only for recurring & not already ended */}
+            {actionTarget && isRecurring(actionTarget.frequency) && !actionTarget.endDate && (
+              <TouchableOpacity
+                style={styles.actionSheetOption}
+                onPress={chooseEnd}
+                activeOpacity={0.7}
+              >
+                <View style={[styles.actionSheetIcon, { backgroundColor: `${Colors.warning}18` }]}>
+                  <Ionicons name="stop-circle" size={20} color={Colors.warning} />
+                </View>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.actionSheetOptionTitle}>End Recurring</Text>
+                  <Text style={styles.actionSheetOptionSub}>Stop future recurrences</Text>
+                </View>
+                <Ionicons name="chevron-forward" size={16} color={Colors.textMuted} />
+              </TouchableOpacity>
+            )}
+
+            {/* Cancel */}
+            <TouchableOpacity
+              style={styles.actionSheetCancel}
+              onPress={closeActionModal}
+              activeOpacity={0.7}
+            >
+              <Text style={styles.actionSheetCancelText}>Cancel</Text>
+            </TouchableOpacity>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      {/* ─── End Recurring Confirmation Modal ─── */}
+      <Modal
+        visible={endModalVisible}
+        transparent
+        animationType="fade"
+        onRequestClose={closeEndModal}
+      >
+        <Pressable style={styles.modalOverlay} onPress={closeEndModal}>
+          <Pressable style={styles.modalContent} onPress={() => {}}>
+            <View style={[styles.modalIconWrap, { backgroundColor: `${Colors.warning}18` }]}>
+              <Ionicons name="stop-circle" size={32} color={Colors.warning} />
+            </View>
+
+            <Text style={styles.modalTitle}>End Recurring Entry</Text>
+
+            {endTarget && (
+              <View style={styles.modalEntry}>
+                <View style={{ flex: 1 }}>
+                  <Text style={styles.modalEntryLabel}>
+                    {endTarget.description || endTarget.label}
+                  </Text>
+                  <Text style={{ fontSize: 12, color: Colors.textMuted, marginTop: 2 }}>
+                    {endTarget.frequency} · started {endTarget.date}
+                  </Text>
+                </View>
+                <Text style={[
+                  styles.modalEntryAmount,
+                  { color: endTarget.kind === 'income' ? Colors.success : Colors.danger },
+                ]}>
+                  {endTarget.kind === 'income' ? '+' : '-'}₹{endTarget.amount.toLocaleString('en-IN')}
+                </Text>
+              </View>
+            )}
+
+            <Text style={styles.modalDesc}>
+              Choose an end date for this recurring entry.{"\n"}
+              Must be on or after the start date.
+            </Text>
+
+            {/* Date input */}
+            <View style={styles.endDateRow}>
+              <Text style={styles.endDateLabel}>End Date</Text>
+              <TextInput
+                style={[
+                  styles.endDateInput,
+                  endDateInput && !isEndDateValid() && styles.endDateInputInvalid,
+                  endDateInput && isEndDateValid() && styles.endDateInputValid,
+                ]}
+                placeholder="YYYY-MM-DD"
+                placeholderTextColor={Colors.textMuted}
+                value={endDateInput}
+                onChangeText={setEndDateInput}
+                keyboardType="numbers-and-punctuation"
+                maxLength={10}
+              />
+            </View>
+            {endDateInput && !isEndDateValid() && endTarget && (
+              <Text style={styles.endDateError}>
+                End date must be on or after {endTarget.date}
+              </Text>
+            )}
+
+            <View style={styles.modalActions}>
+              <TouchableOpacity
+                style={styles.modalCancelBtn}
+                onPress={closeEndModal}
+                activeOpacity={0.7}
+              >
+                <Text style={styles.modalCancelText}>Cancel</Text>
+              </TouchableOpacity>
+
+              <TouchableOpacity
+                style={[styles.endConfirmBtn, !isEndDateValid() && { opacity: 0.35 }]}
+                onPress={confirmEnd}
+                activeOpacity={0.7}
+                disabled={!isEndDateValid() || ending}
+              >
+                {ending ? (
+                  <ActivityIndicator size="small" color="#fff" />
+                ) : (
+                  <>
+                    <Ionicons name="checkmark-circle" size={16} color="#fff" />
+                    <Text style={styles.endConfirmText}>End Now</Text>
+                  </>
+                )}
+              </TouchableOpacity>
+            </View>
+          </Pressable>
+        </Pressable>
+      </Modal>
     </SafeAreaView>
   );
 }
@@ -646,4 +995,274 @@ const styles = StyleSheet.create({
   empty: { alignItems: 'center', paddingTop: 80, gap: 12 },
   emptyTitle: { fontSize: 18, fontWeight: '700', color: Colors.textSecondary },
   emptyBody: { fontSize: 13, color: Colors.textMuted, textAlign: 'center', paddingHorizontal: 40 },
+
+  // Delete modal
+  modalOverlay: {
+    flex: 1,
+    backgroundColor: 'rgba(0,0,0,0.65)',
+    justifyContent: 'center',
+    alignItems: 'center',
+    padding: Spacing.lg,
+  },
+  modalContent: {
+    width: '100%',
+    maxWidth: 360,
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.xl,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    padding: Spacing.xl,
+    alignItems: 'center',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.5,
+    shadowRadius: 32,
+    elevation: 20,
+  },
+  modalIconWrap: {
+    width: 64,
+    height: 64,
+    borderRadius: 32,
+    backgroundColor: `${Colors.danger}18`,
+    alignItems: 'center',
+    justifyContent: 'center',
+    marginBottom: Spacing.md,
+  },
+  modalTitle: {
+    fontSize: 20,
+    fontWeight: '800',
+    color: Colors.textPrimary,
+    marginBottom: Spacing.sm,
+  },
+  modalEntry: {
+    width: '100%',
+    backgroundColor: Colors.card,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    borderRadius: Radius.md,
+    padding: Spacing.md,
+    flexDirection: 'row',
+    justifyContent: 'space-between',
+    alignItems: 'center',
+    marginBottom: Spacing.md,
+  },
+  modalEntryLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.textPrimary,
+    flex: 1,
+  },
+  modalEntryAmount: {
+    fontSize: 15,
+    fontWeight: '700',
+  },
+  modalDesc: {
+    fontSize: 13,
+    color: Colors.textSecondary,
+    textAlign: 'center',
+    lineHeight: 20,
+    marginBottom: Spacing.md,
+  },
+  modalBold: {
+    fontWeight: '800',
+    color: Colors.danger,
+  },
+  modalInput: {
+    width: '100%',
+    backgroundColor: Colors.card,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    borderRadius: Radius.md,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 15,
+    fontWeight: '600',
+    color: Colors.textPrimary,
+    textAlign: 'center',
+    marginBottom: Spacing.lg,
+  },
+  modalInputValid: {
+    borderColor: Colors.danger,
+    backgroundColor: `${Colors.danger}0A`,
+  },
+  modalActions: {
+    flexDirection: 'row',
+    gap: 12,
+    width: '100%',
+  },
+  modalCancelBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.card,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  modalCancelText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Colors.textSecondary,
+  },
+  modalDeleteBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.danger,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  modalDeleteBtnDisabled: {
+    opacity: 0.35,
+  },
+  modalDeleteText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#fff',
+  },
+
+  // End recurring styles
+  endRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    marginTop: 4,
+  },
+  endedBadge: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 4,
+    backgroundColor: `${Colors.textMuted}18`,
+    paddingHorizontal: 8,
+    paddingVertical: 3,
+    borderRadius: 10,
+  },
+  endedText: {
+    fontSize: 10,
+    fontWeight: '600',
+    color: Colors.textMuted,
+  },
+  endConfirmBtn: {
+    flex: 1,
+    paddingVertical: 14,
+    borderRadius: Radius.md,
+    backgroundColor: Colors.warning,
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'center',
+    gap: 6,
+  },
+  endConfirmText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: '#fff',
+  },
+  endDateRow: {
+    width: '100%',
+    marginBottom: Spacing.sm,
+  },
+  endDateLabel: {
+    fontSize: 12,
+    fontWeight: '600',
+    color: Colors.textSecondary,
+    marginBottom: 6,
+  },
+  endDateInput: {
+    width: '100%',
+    backgroundColor: Colors.card,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    borderRadius: Radius.md,
+    paddingHorizontal: 16,
+    paddingVertical: 14,
+    fontSize: 15,
+    fontWeight: '600',
+    color: Colors.textPrimary,
+    textAlign: 'center',
+  },
+  endDateInputValid: {
+    borderColor: Colors.warning,
+    backgroundColor: `${Colors.warning}0A`,
+  },
+  endDateInputInvalid: {
+    borderColor: Colors.danger,
+    backgroundColor: `${Colors.danger}0A`,
+  },
+  endDateError: {
+    fontSize: 11,
+    color: Colors.danger,
+    fontWeight: '600',
+    marginBottom: Spacing.md,
+    textAlign: 'center',
+  },
+
+  // Action sheet
+  actionSheet: {
+    width: '100%',
+    maxWidth: 380,
+    backgroundColor: Colors.surface,
+    borderRadius: Radius.xl,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    overflow: 'hidden',
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 16 },
+    shadowOpacity: 0.5,
+    shadowRadius: 32,
+    elevation: 20,
+  },
+  actionSheetHeader: {
+    padding: Spacing.lg,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.cardBorder,
+    alignItems: 'center',
+  },
+  actionSheetTitle: {
+    fontSize: 16,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+    marginBottom: 2,
+  },
+  actionSheetSub: {
+    fontSize: 12,
+    color: Colors.textMuted,
+    fontWeight: '500',
+  },
+  actionSheetOption: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    padding: Spacing.md,
+    paddingHorizontal: Spacing.lg,
+    gap: 14,
+    borderBottomWidth: 1,
+    borderBottomColor: Colors.cardBorder,
+  },
+  actionSheetIcon: {
+    width: 40,
+    height: 40,
+    borderRadius: 20,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  actionSheetOptionTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+  },
+  actionSheetOptionSub: {
+    fontSize: 12,
+    color: Colors.textMuted,
+    fontWeight: '500',
+  },
+  actionSheetCancel: {
+    padding: Spacing.md,
+    alignItems: 'center',
+  },
+  actionSheetCancelText: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: Colors.textSecondary,
+  },
 });

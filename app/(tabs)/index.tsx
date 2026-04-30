@@ -73,7 +73,8 @@ export default function DashboardScreen() {
     let expQ = supabase
       .from('expenses')
       .select('*')
-      .eq('user_id', user.id);
+      .eq('user_id', user.id)
+      .is('deleted_at', null);
     if (dateRange) {
       expQ = expQ.gte('start_date', dateRange.start).lte('start_date', dateRange.end);
     }
@@ -82,7 +83,8 @@ export default function DashboardScreen() {
     let incQ = supabase
       .from('income')
       .select('*')
-      .eq('user_id', user.id);
+      .eq('user_id', user.id)
+      .is('deleted_at', null);
     if (dateRange) {
       incQ = incQ.gte('start_date', dateRange.start).lte('start_date', dateRange.end);
     }

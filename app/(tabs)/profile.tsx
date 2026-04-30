@@ -1,4 +1,4 @@
-import React from 'react';
+import React, { useState } from 'react';
 import {
   View, Text, StyleSheet,
   TouchableOpacity, ScrollView, Alert,
@@ -9,9 +9,11 @@ import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/hooks/useAuth';
 import { Colors, Gradients, Spacing, Radius } from '@/constants/Theme';
 import { Icons } from '@/constants/Icons';
+import FeatureGuide from '@/components/FeatureGuide';
 
 export default function ProfileScreen() {
   const { user, signOut } = useAuth();
+  const [guideVisible, setGuideVisible] = useState(false);
 
   const displayName: string = user?.user_metadata?.full_name || user?.email?.split('@')[0] || 'User';
   const email: string = user?.email || '';
@@ -102,6 +104,22 @@ export default function ProfileScreen() {
           ))}
         </View>
 
+        {/* Feature Guide button */}
+        <TouchableOpacity
+          style={styles.guideBtn}
+          onPress={() => setGuideVisible(true)}
+          activeOpacity={0.8}
+        >
+          <View style={styles.guideBtnIcon}>
+            <Ionicons name="book-outline" size={20} color={Colors.primary} />
+          </View>
+          <View style={styles.guideBtnContent}>
+            <Text style={styles.guideBtnTitle}>Feature Guide</Text>
+            <Text style={styles.guideBtnSub}>Learn gestures & tips</Text>
+          </View>
+          <Ionicons name="chevron-forward" size={18} color={Colors.textMuted} />
+        </TouchableOpacity>
+
         {/* Sign out button */}
         <TouchableOpacity style={styles.signOutBtn} onPress={handleSignOut} activeOpacity={0.8}>
           <Ionicons name={Icons.logout} size={20} color={Colors.danger} />
@@ -110,6 +128,9 @@ export default function ProfileScreen() {
 
         <Text style={styles.version}>MYM v1.0.0</Text>
       </ScrollView>
+
+      {/* Feature Guide Modal */}
+      <FeatureGuide visible={guideVisible} onClose={() => setGuideVisible(false)} />
     </SafeAreaView>
   );
 }
@@ -205,4 +226,38 @@ const styles = StyleSheet.create({
   signOutText: { fontSize: 16, fontWeight: '700', color: Colors.danger },
 
   version: { textAlign: 'center', color: Colors.textMuted, fontSize: 12 },
+
+  // Feature Guide button
+  guideBtn: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: Colors.card,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    borderRadius: Radius.xl,
+    padding: Spacing.md,
+    gap: 14,
+  },
+  guideBtnIcon: {
+    width: 42,
+    height: 42,
+    borderRadius: 21,
+    backgroundColor: `${Colors.primary}18`,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  guideBtnContent: {
+    flex: 1,
+  },
+  guideBtnTitle: {
+    fontSize: 15,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+    marginBottom: 2,
+  },
+  guideBtnSub: {
+    fontSize: 12,
+    color: Colors.textMuted,
+    fontWeight: '500',
+  },
 });
