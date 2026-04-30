@@ -242,67 +242,67 @@ export default function TransactionsScreen() {
 
       {/* Header */}
       <View style={styles.header}>
-        <View style={styles.headerLeft}>
-          <Text style={styles.headerTitle}>History</Text>
-          {/* Kind filter dot */}
-          <View style={{ position: 'relative', zIndex: 20 }}>
-            <TouchableOpacity
-              onPress={toggleKindDropdown}
-              style={styles.kindDotBtn}
-              activeOpacity={0.7}
-            >
-              <View style={[styles.kindDot, { backgroundColor: currentKindDot.color }]} />
-              <Text style={styles.kindDotLabel}>{currentKindDot.label}</Text>
-              <Ionicons
-                name={kindDropdownOpen ? 'chevron-up' : 'chevron-down'}
-                size={12}
-                color={Colors.textSecondary}
-              />
-            </TouchableOpacity>
+        <Text style={styles.headerTitle}>History</Text>
 
-            {/* Kind dropdown menu */}
-            {kindDropdownOpen && (
-              <Animated.View
-                style={[
-                  styles.kindDropdownMenu,
-                  {
-                    opacity: kindDropdownAnim,
-                    transform: [
-                      {
-                        translateY: kindDropdownAnim.interpolate({
-                          inputRange: [0, 1],
-                          outputRange: [-8, 0],
-                        }),
-                      },
-                    ],
-                  },
-                ]}
-              >
-                {KIND_FILTERS.map(({ key, label, color }) => {
-                  const active = kindFilter === key;
-                  return (
-                    <TouchableOpacity
-                      key={key}
-                      style={[styles.kindDropdownItem, active && styles.kindDropdownItemActive]}
-                      onPress={() => selectKind(key)}
-                      activeOpacity={0.7}
+        {/* Kind filter dot (centered) */}
+        <View style={{ position: 'relative', zIndex: 20, alignItems: 'center' }}>
+          <TouchableOpacity
+            onPress={toggleKindDropdown}
+            style={styles.kindDotBtn}
+            activeOpacity={0.7}
+          >
+            <View style={[styles.kindDot, { backgroundColor: currentKindDot.color }]} />
+            <Text style={styles.kindDotLabel}>{currentKindDot.label}</Text>
+            <Ionicons
+              name={kindDropdownOpen ? 'chevron-up' : 'chevron-down'}
+              size={12}
+              color={Colors.textSecondary}
+            />
+          </TouchableOpacity>
+
+          {/* Kind dropdown menu */}
+          {kindDropdownOpen && (
+            <Animated.View
+              style={[
+                styles.kindDropdownMenu,
+                {
+                  opacity: kindDropdownAnim,
+                  transform: [
+                    {
+                      translateY: kindDropdownAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [-8, 0],
+                      }),
+                    },
+                  ],
+                },
+              ]}
+            >
+              {KIND_FILTERS.map(({ key, label, color }) => {
+                const active = kindFilter === key;
+                return (
+                  <TouchableOpacity
+                    key={key}
+                    style={[styles.kindDropdownItem, active && styles.kindDropdownItemActive]}
+                    onPress={() => selectKind(key)}
+                    activeOpacity={0.7}
+                  >
+                    <View style={[styles.kindDotSmall, { backgroundColor: color }]} />
+                    <Text
+                      style={[styles.kindDropdownText, active && { color, fontWeight: '700' }]}
                     >
-                      <View style={[styles.kindDotSmall, { backgroundColor: color }]} />
-                      <Text
-                        style={[styles.kindDropdownText, active && { color, fontWeight: '700' }]}
-                      >
-                        {label}
-                      </Text>
-                      {active && (
-                        <Ionicons name="checkmark" size={14} color={color} style={{ marginLeft: 'auto' }} />
-                      )}
-                    </TouchableOpacity>
-                  );
-                })}
-              </Animated.View>
-            )}
-          </View>
+                      {label}
+                    </Text>
+                    {active && (
+                      <Ionicons name="checkmark" size={14} color={color} style={{ marginLeft: 'auto' }} />
+                    )}
+                  </TouchableOpacity>
+                );
+              })}
+            </Animated.View>
+          )}
         </View>
+
         <Text style={styles.headerCount}>{filtered.length} entries</Text>
       </View>
 
