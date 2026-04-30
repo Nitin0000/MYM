@@ -9,8 +9,8 @@ import { LinearGradient } from 'expo-linear-gradient';
 import { Ionicons } from '@expo/vector-icons';
 import { useAuth } from '@/hooks/useAuth';
 import { Colors, Gradients, Spacing, Radius } from '@/constants/Theme';
-import { formatCurrency } from '@/utils/currency';
 import { Icons } from '@/constants/Icons';
+import CompactAmount from '@/components/CompactAmount';
 import type { TimeFilter, UnifiedEntry, Expense, Income } from '@/utils/types';
 
 const MONTHS = [
@@ -171,9 +171,12 @@ export default function TransactionsScreen() {
           <Text style={styles.date}>{item.date}</Text>
         </View>
         <View style={styles.right}>
-          <Text style={[styles.amount, { color }]}>
-            {isIncome ? '+' : '-'}{formatCurrency(item.amount)}
-          </Text>
+          <CompactAmount
+            amount={item.amount}
+            prefix={isIncome ? '+' : '-'}
+            color={color}
+            style={styles.amount}
+          />
           <View style={[styles.typePill, { backgroundColor: `${color}22` }]}>
             <Text style={[styles.typeLabel, { color }]}>
               {isIncome ? 'Income' : 'Expense'}

@@ -12,6 +12,7 @@ import { Colors, Gradients, Spacing, Radius } from '@/constants/Theme';
 import { formatCurrency } from '@/utils/currency';
 import { Icons } from '@/constants/Icons';
 import { useRouter } from 'expo-router';
+import CompactAmount from '@/components/CompactAmount';
 import type { TimeFilter, UnifiedEntry, Expense, Income } from '@/utils/types';
 
 const MONTHS = [
@@ -249,9 +250,10 @@ export default function DashboardScreen() {
           <Text style={styles.balanceLabel}>
             {timeFilter === 'all' ? 'Total Balance' : `Balance · ${filterLabel}`}
           </Text>
-          <Text style={styles.balanceAmount}>
-            {formatCurrency(balance, 2)}
-          </Text>
+          <CompactAmount
+            amount={balance}
+            style={styles.balanceAmount}
+          />
 
           <View style={styles.statsRow}>
             <StatBox label="Income" amount={totalIncome} color={Colors.success} icon={Icons.income} />
@@ -298,9 +300,13 @@ function StatBox({ label, amount, color, icon }: {
       </View>
       <View style={{ flex: 1 }}>
         <Text style={statStyles.label} numberOfLines={1}>{label}</Text>
-        <Text style={[statStyles.amount, { color }]} numberOfLines={1} adjustsFontSizeToFit>
-          {formatCurrency(amount, 0)}
-        </Text>
+        <CompactAmount
+          amount={amount}
+          color={color}
+          style={statStyles.amount}
+          numberOfLines={1}
+          adjustsFontSizeToFit
+        />
       </View>
     </View>
   );
@@ -337,9 +343,12 @@ function EntryRow({ entry }: { entry: UnifiedEntry }) {
         </View>
         <Text style={rowStyles.date}>{entry.date}</Text>
       </View>
-      <Text style={[rowStyles.amount, { color }]}>
-        {isIncome ? '+' : '-'}{formatCurrency(entry.amount)}
-      </Text>
+      <CompactAmount
+        amount={entry.amount}
+        prefix={isIncome ? '+' : '-'}
+        color={color}
+        style={rowStyles.amount}
+      />
     </View>
   );
 }
