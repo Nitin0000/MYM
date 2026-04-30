@@ -10,6 +10,7 @@ import { useAuth } from '@/hooks/useAuth';
 import { Colors, Gradients, Spacing, Radius } from '@/constants/Theme';
 import { Icons } from '@/constants/Icons';
 import FeatureGuide from '@/components/FeatureGuide';
+import Constants from 'expo-constants';
 
 export default function ProfileScreen() {
   const { user, signOut } = useAuth();
@@ -126,7 +127,7 @@ export default function ProfileScreen() {
           <Text style={styles.signOutText}>Sign Out</Text>
         </TouchableOpacity>
 
-        <Text style={styles.version}>MYM v1.0.0</Text>
+        <Text style={styles.version}>MYM v{Constants.expoConfig?.version ?? '1.0.0'}</Text>
       </ScrollView>
 
       {/* Feature Guide Modal */}
