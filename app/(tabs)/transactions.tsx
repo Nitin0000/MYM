@@ -1,7 +1,8 @@
-import React, { useEffect, useState, useCallback } from 'react';
+import React, { useEffect, useState, useCallback, useRef } from 'react';
 import {
   StyleSheet, Text, View, FlatList,
   ActivityIndicator, TouchableOpacity,
+  Pressable, Animated,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { supabase } from '@/lib/supabase';
@@ -20,11 +21,21 @@ const MONTHS = [
 
 type KindFilter = 'all' | 'income' | 'expense';
 
+const TIME_FILTERS: { key: TimeFilter; label: string }[] = [
+  { key: 'month', label: 'Monthly' },
+  { key: 'year', label: 'Yearly' },
+  { key: 'all', label: 'All Time' },
+];
+
 export default function TransactionsScreen() {
   const { user } = useAuth();
   const [entries, setEntries] = useState<UnifiedEntry[]>([]);
   const [loading, setLoading] = useState(true);
   const [kindFilter, setKindFilter] = useState<KindFilter>('all');
+  const [dropdownOpen, setDropdownOpen] = useState(false);
+  const dropdownAnim = useRef(new Animated.Value(0)).current;
+  const [kindDropdownOpen, setKindDropdownOpen] = useState(false);
+  const kindDropdownAnim = useRef(new Animated.Value(0)).current;
 
   // Time filter
   const [timeFilter, setTimeFilter] = useState<TimeFilter>('month');
@@ -133,6 +144,44 @@ export default function TransactionsScreen() {
     ? `${selectedYear}`
     : 'All Time';
 
+  const currentFilterName = TIME_FILTERS.find(f => f.key === timeFilter)?.label || 'Monthly';
+
+  const toggleDropdown = () => {
+    if (dropdownOpen) {
+      Animated.timing(dropdownAnim, { toValue: 0, duration: 180, useNativeDriver: false }).start(() => setDropdownOpen(false));
+    } else {
+      setDropdownOpen(true);
+      Animated.timing(dropdownAnim, { toValue: 1, duration: 180, useNativeDriver: false }).start();
+    }
+  };
+
+  const selectFilter = (key: TimeFilter) => {
+    setTimeFilter(key);
+    Animated.timing(dropdownAnim, { toValue: 0, duration: 150, useNativeDriver: false }).start(() => setDropdownOpen(false));
+  };
+
+  const KIND_FILTERS: { key: KindFilter; label: string; color: string }[] = [
+    { key: 'all', label: 'All', color: Colors.textMuted },
+    { key: 'income', label: 'Income', color: Colors.success },
+    { key: 'expense', label: 'Expense', color: Colors.danger },
+  ];
+
+  const currentKindDot = KIND_FILTERS.find(f => f.key === kindFilter)!;
+
+  const toggleKindDropdown = () => {
+    if (kindDropdownOpen) {
+      Animated.timing(kindDropdownAnim, { toValue: 0, duration: 180, useNativeDriver: false }).start(() => setKindDropdownOpen(false));
+    } else {
+      setKindDropdownOpen(true);
+      Animated.timing(kindDropdownAnim, { toValue: 1, duration: 180, useNativeDriver: false }).start();
+    }
+  };
+
+  const selectKind = (key: KindFilter) => {
+    setKindFilter(key);
+    Animated.timing(kindDropdownAnim, { toValue: 0, duration: 150, useNativeDriver: false }).start(() => setKindDropdownOpen(false));
+  };
+
   const renderItem = ({ item }: { item: UnifiedEntry }) => {
     const isIncome = item.kind === 'income';
     const color = isIncome ? Colors.success : Colors.danger;
@@ -193,74 +242,172 @@ export default function TransactionsScreen() {
 
       {/* Header */}
       <View style={styles.header}>
-        <Text style={styles.headerTitle}>History</Text>
+        <View style={styles.headerLeft}>
+          <Text style={styles.headerTitle}>History</Text>
+          {/* Kind filter dot */}
+          <View style={{ position: 'relative', zIndex: 20 }}>
+            <TouchableOpacity
+              onPress={toggleKindDropdown}
+              style={styles.kindDotBtn}
+              activeOpacity={0.7}
+            >
+              <View style={[styles.kindDot, { backgroundColor: currentKindDot.color }]} />
+              <Text style={styles.kindDotLabel}>{currentKindDot.label}</Text>
+              <Ionicons
+                name={kindDropdownOpen ? 'chevron-up' : 'chevron-down'}
+                size={12}
+                color={Colors.textSecondary}
+              />
+            </TouchableOpacity>
+
+            {/* Kind dropdown menu */}
+            {kindDropdownOpen && (
+              <Animated.View
+                style={[
+                  styles.kindDropdownMenu,
+                  {
+                    opacity: kindDropdownAnim,
+                    transform: [
+                      {
+                        translateY: kindDropdownAnim.interpolate({
+                          inputRange: [0, 1],
+                          outputRange: [-8, 0],
+                        }),
+                      },
+                    ],
+                  },
+                ]}
+              >
+                {KIND_FILTERS.map(({ key, label, color }) => {
+                  const active = kindFilter === key;
+                  return (
+                    <TouchableOpacity
+                      key={key}
+                      style={[styles.kindDropdownItem, active && styles.kindDropdownItemActive]}
+                      onPress={() => selectKind(key)}
+                      activeOpacity={0.7}
+                    >
+                      <View style={[styles.kindDotSmall, { backgroundColor: color }]} />
+                      <Text
+                        style={[styles.kindDropdownText, active && { color, fontWeight: '700' }]}
+                      >
+                        {label}
+                      </Text>
+                      {active && (
+                        <Ionicons name="checkmark" size={14} color={color} style={{ marginLeft: 'auto' }} />
+                      )}
+                    </TouchableOpacity>
+                  );
+                })}
+              </Animated.View>
+            )}
+          </View>
+        </View>
         <Text style={styles.headerCount}>{filtered.length} entries</Text>
       </View>
 
-      {/* Time Filter */}
-      <View style={styles.timeFilterRow}>
-        {([
-          { key: 'month' as TimeFilter, label: 'Monthly' },
-          { key: 'year' as TimeFilter, label: 'Yearly' },
-          { key: 'all' as TimeFilter, label: 'All' },
-        ]).map(({ key, label }) => {
-          const active = timeFilter === key;
-          return (
-            <TouchableOpacity
-              key={key}
-              style={[styles.timeFilterPill, active && styles.timeFilterPillActive]}
-              onPress={() => setTimeFilter(key)}
-              activeOpacity={0.75}
-            >
-              <Text style={[styles.timeFilterText, active && { color: '#fff' }]}>
-                {label}
-              </Text>
-            </TouchableOpacity>
-          );
-        })}
-      </View>
-
-      {/* Period Navigator */}
-      {timeFilter !== 'all' && (
-        <View style={styles.periodNav}>
-          <TouchableOpacity
-            onPress={() => timeFilter === 'month' ? navigateMonth(-1) : navigateYear(-1)}
-            style={styles.periodArrow}
-            activeOpacity={0.7}
-          >
-            <Ionicons name={Icons.chevronBack} size={18} color={Colors.textSecondary} />
-          </TouchableOpacity>
-          <Text style={styles.periodLabel}>{filterLabel}</Text>
-          <TouchableOpacity
-            onPress={() => timeFilter === 'month' ? navigateMonth(1) : navigateYear(1)}
-            style={[styles.periodArrow, !canGoForward && { opacity: 0.3 }]}
-            activeOpacity={0.7}
-            disabled={!canGoForward}
-          >
-            <Ionicons name={Icons.chevronForward} size={18} color={Colors.textSecondary} />
-          </TouchableOpacity>
-        </View>
+      {/* Close kind dropdown when tapping outside */}
+      {kindDropdownOpen && (
+        <Pressable
+          style={[StyleSheet.absoluteFillObject, { zIndex: 15 }]}
+          onPress={toggleKindDropdown}
+        />
       )}
 
-      {/* Kind Filter Pills */}
-      <View style={styles.filterRow}>
-        {(['all', 'income', 'expense'] as KindFilter[]).map((f) => {
-          const active = kindFilter === f;
-          const color = f === 'income' ? Colors.success : f === 'expense' ? Colors.danger : Colors.primary;
-          return (
-            <TouchableOpacity
-              key={f}
-              style={[styles.filterPill, active && { backgroundColor: color }]}
-              onPress={() => setKindFilter(f)}
-              activeOpacity={0.75}
+      {/* ─── Filter Row: Dropdown + Period Navigator ─── */}
+      <View style={styles.timeFilterRow}>
+        {/* Dropdown Trigger */}
+        <View style={{ position: 'relative', zIndex: 10 }}>
+          <TouchableOpacity
+            style={styles.dropdownTrigger}
+            onPress={toggleDropdown}
+            activeOpacity={0.8}
+          >
+            <Ionicons name={Icons.filter} size={16} color={Colors.primary} />
+            <Text style={styles.dropdownTriggerText}>{currentFilterName}</Text>
+            <Ionicons
+              name={dropdownOpen ? 'chevron-up' : 'chevron-down'}
+              size={14}
+              color={Colors.textSecondary}
+            />
+          </TouchableOpacity>
+
+          {/* Dropdown Menu */}
+          {dropdownOpen && (
+            <Animated.View
+              style={[
+                styles.dropdownMenu,
+                {
+                  opacity: dropdownAnim,
+                  transform: [
+                    {
+                      translateY: dropdownAnim.interpolate({
+                        inputRange: [0, 1],
+                        outputRange: [-8, 0],
+                      }),
+                    },
+                  ],
+                },
+              ]}
             >
-              <Text style={[styles.filterLabel, active && { color: '#fff' }]}>
-                {f.charAt(0).toUpperCase() + f.slice(1)}
-              </Text>
+              {TIME_FILTERS.map(({ key, label }) => {
+                const active = timeFilter === key;
+                return (
+                  <TouchableOpacity
+                    key={key}
+                    style={[styles.dropdownItem, active && styles.dropdownItemActive]}
+                    onPress={() => selectFilter(key)}
+                    activeOpacity={0.7}
+                  >
+                    {active && (
+                      <Ionicons name="checkmark" size={16} color={Colors.primary} style={{ marginRight: 6 }} />
+                    )}
+                    <Text
+                      style={[styles.dropdownItemText, active && styles.dropdownItemTextActive]}
+                    >
+                      {label}
+                    </Text>
+                  </TouchableOpacity>
+                );
+              })}
+            </Animated.View>
+          )}
+        </View>
+
+        {/* Period Navigator (right side) */}
+        {timeFilter !== 'all' ? (
+          <View style={styles.periodNav}>
+            <TouchableOpacity
+              onPress={() => timeFilter === 'month' ? navigateMonth(-1) : navigateYear(-1)}
+              style={styles.periodArrow}
+              activeOpacity={0.7}
+            >
+              <Ionicons name={Icons.chevronBack} size={18} color={Colors.textSecondary} />
             </TouchableOpacity>
-          );
-        })}
+            <Text style={styles.periodLabel}>{filterLabel}</Text>
+            <TouchableOpacity
+              onPress={() => timeFilter === 'month' ? navigateMonth(1) : navigateYear(1)}
+              style={[styles.periodArrow, !canGoForward && { opacity: 0.3 }]}
+              activeOpacity={0.7}
+              disabled={!canGoForward}
+            >
+              <Ionicons name={Icons.chevronForward} size={18} color={Colors.textSecondary} />
+            </TouchableOpacity>
+          </View>
+        ) : (
+          <Text style={styles.allTimeLabel}>All Time</Text>
+        )}
       </View>
+
+      {/* Close dropdown when tapping outside */}
+      {dropdownOpen && (
+        <Pressable
+          style={StyleSheet.absoluteFillObject}
+          onPress={toggleDropdown}
+        />
+      )}
+
+
 
       {loading ? (
         <ActivityIndicator size="large" color={Colors.primary} style={styles.loader} />
@@ -297,41 +444,152 @@ const styles = StyleSheet.create({
     paddingTop: Spacing.md,
     paddingBottom: Spacing.xs,
     flexDirection: 'row',
-    alignItems: 'baseline',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    zIndex: 20,
+  },
+  headerLeft: {
+    flexDirection: 'row',
+    alignItems: 'center',
     gap: 10,
   },
   headerTitle: { fontSize: 26, fontWeight: '800', color: Colors.textPrimary },
   headerCount: { fontSize: 14, color: Colors.textMuted, fontWeight: '500' },
 
-  // Time filter
-  timeFilterRow: {
+  // Kind dot filter
+  kindDotBtn: {
     flexDirection: 'row',
-    paddingHorizontal: Spacing.lg,
-    gap: 8,
-    marginBottom: Spacing.sm,
-  },
-  timeFilterPill: {
-    flex: 1,
-    paddingVertical: 8,
-    borderRadius: 30,
+    alignItems: 'center',
+    gap: 6,
     backgroundColor: Colors.card,
     borderWidth: 1,
     borderColor: Colors.cardBorder,
+    paddingHorizontal: 12,
+    paddingVertical: 8,
+    borderRadius: 20,
+  },
+  kindDot: {
+    width: 10,
+    height: 10,
+    borderRadius: 5,
+  },
+  kindDotLabel: {
+    fontSize: 13,
+    fontWeight: '600',
+    color: Colors.textPrimary,
+  },
+  kindDropdownMenu: {
+    position: 'absolute',
+    top: '100%',
+    left: 0,
+    marginTop: 6,
+    minWidth: 140,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    borderRadius: 14,
+    paddingVertical: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 14,
+  },
+  kindDropdownItem: {
+    flexDirection: 'row',
     alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+    gap: 8,
   },
-  timeFilterPillActive: {
-    backgroundColor: Colors.primary,
-    borderColor: Colors.primary,
+  kindDropdownItemActive: {
+    backgroundColor: 'rgba(255,255,255,0.04)',
   },
-  timeFilterText: { fontSize: 12, fontWeight: '700', color: Colors.textMuted },
+  kindDotSmall: {
+    width: 8,
+    height: 8,
+    borderRadius: 4,
+  },
+  kindDropdownText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.textSecondary,
+  },
 
-  // Period navigator
+  // Time filter row (dropdown + period nav inline)
+  timeFilterRow: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    justifyContent: 'space-between',
+    paddingHorizontal: Spacing.lg,
+    marginBottom: Spacing.sm,
+    zIndex: 10,
+  },
+
+  // Dropdown
+  dropdownTrigger: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 6,
+    backgroundColor: Colors.card,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    paddingHorizontal: 14,
+    paddingVertical: 10,
+    borderRadius: 14,
+  },
+  dropdownTriggerText: {
+    fontSize: 14,
+    fontWeight: '700',
+    color: Colors.textPrimary,
+  },
+  dropdownMenu: {
+    position: 'absolute',
+    top: '100%',
+    left: 0,
+    marginTop: 6,
+    minWidth: 150,
+    backgroundColor: Colors.surface,
+    borderWidth: 1,
+    borderColor: Colors.cardBorder,
+    borderRadius: 14,
+    paddingVertical: 4,
+    shadowColor: '#000',
+    shadowOffset: { width: 0, height: 8 },
+    shadowOpacity: 0.4,
+    shadowRadius: 16,
+    elevation: 12,
+  },
+  dropdownItem: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    paddingHorizontal: 14,
+    paddingVertical: 11,
+  },
+  dropdownItemActive: {
+    backgroundColor: `${Colors.primary}18`,
+  },
+  dropdownItemText: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.textSecondary,
+  },
+  dropdownItemTextActive: {
+    color: Colors.primary,
+    fontWeight: '700',
+  },
+  allTimeLabel: {
+    fontSize: 14,
+    fontWeight: '600',
+    color: Colors.textMuted,
+    fontStyle: 'italic',
+  },
+
+  // Period navigator (inline, right side)
   periodNav: {
     flexDirection: 'row',
     alignItems: 'center',
-    justifyContent: 'center',
-    gap: 14,
-    marginBottom: Spacing.sm,
+    gap: 10,
   },
   periodArrow: {
     width: 32,
@@ -344,29 +602,14 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
   },
   periodLabel: {
-    fontSize: 15,
+    fontSize: 14,
     fontWeight: '700',
     color: Colors.textPrimary,
-    minWidth: 130,
+    minWidth: 100,
     textAlign: 'center',
   },
 
-  // Kind filter
-  filterRow: {
-    flexDirection: 'row',
-    paddingHorizontal: Spacing.lg,
-    gap: 8,
-    marginBottom: Spacing.md,
-  },
-  filterPill: {
-    paddingHorizontal: 16,
-    paddingVertical: 8,
-    borderRadius: 30,
-    backgroundColor: Colors.card,
-    borderWidth: 1,
-    borderColor: Colors.cardBorder,
-  },
-  filterLabel: { fontSize: 13, fontWeight: '600', color: Colors.textSecondary },
+
 
   loader: { flex: 1 },
   list: { paddingHorizontal: Spacing.lg, paddingBottom: 20 },
