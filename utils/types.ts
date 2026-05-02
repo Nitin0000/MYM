@@ -59,6 +59,8 @@ export type UnifiedEntry = {
   expenseType?: ExpenseType;  // only for expenses
   isEssential?: boolean;      // only for expenses
   endDate?: string | null;    // end date for recurring entries
+  isPredicted?: boolean;      // flag for future predicted entries
+  original_id?: string;       // base DB id, needed since occurrences modify the `id` field
   created_at: string;
 };
 

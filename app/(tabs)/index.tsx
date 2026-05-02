@@ -15,6 +15,7 @@ import { Icons } from '@/constants/Icons';
 import { useRouter } from 'expo-router';
 import CompactAmount from '@/components/CompactAmount';
 import type { TimeFilter, UnifiedEntry, Expense, Income } from '@/utils/types';
+import { processEntries } from '@/utils/calculations';
 
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -69,36 +70,27 @@ export default function DashboardScreen() {
 
     const dateRange = getDateRange();
 
-    // Build expense query
+    // Build queries - fetch ALL active entries for accurate recurring & prediction logic
     let expQ = supabase
       .from('expenses')
       .select('*')
       .eq('user_id', user.id)
       .is('deleted_at', null);
-    if (dateRange) {
-      expQ = expQ.gte('start_date', dateRange.start).lte('start_date', dateRange.end);
-    }
 
-    // Build income query
     let incQ = supabase
       .from('income')
       .select('*')
       .eq('user_id', user.id)
       .is('deleted_at', null);
-    if (dateRange) {
-      incQ = incQ.gte('start_date', dateRange.start).lte('start_date', dateRange.end);
-    }
 
     const [{ data: expenses }, { data: incomes }] = await Promise.all([expQ, incQ]);
 
-    // Calculate totals
-    let incSum = 0, expSum = 0;
-    const unified: UnifiedEntry[] = [];
+    // Build raw entries
+    const rawUnified: UnifiedEntry[] = [];
 
     if (incomes) {
       (incomes as Income[]).forEach((i) => {
-        incSum += Number(i.amount);
-        unified.push({
+        rawUnified.push({
           id: i.id,
           amount: Number(i.amount),
           kind: 'income',
@@ -106,6 +98,7 @@ export default function DashboardScreen() {
           date: i.start_date,
           description: i.description,
           frequency: i.frequency,
+          endDate: i.end_date,
           created_at: i.created_at,
         });
       });
@@ -113,8 +106,7 @@ export default function DashboardScreen() {
 
     if (expenses) {
       (expenses as Expense[]).forEach((e) => {
-        expSum += Number(e.amount);
-        unified.push({
+        rawUnified.push({
           id: e.id,
           amount: Number(e.amount),
           kind: 'expense',
@@ -124,17 +116,23 @@ export default function DashboardScreen() {
           frequency: e.frequency,
           expenseType: e.type,
           isEssential: e.is_essential,
+          endDate: e.end_date,
           created_at: e.created_at,
         });
       });
     }
 
-    // Sort by date desc, then created_at desc
-    unified.sort((a, b) => {
-      const d = b.date.localeCompare(a.date);
-      if (d !== 0) return d;
-      return b.created_at.localeCompare(a.created_at);
-    });
+    // Process recurrences and future predictions
+    const unified = processEntries(rawUnified, timeFilter, dateRange);
+
+    // Calculate totals from PROCESSED entries
+    let incSum = 0, expSum = 0;
+    for (const item of unified) {
+      if (item.kind === 'income') incSum += item.amount;
+      if (item.kind === 'expense') expSum += item.amount;
+    }
+
+    // processEntries handles sorting already
 
     setTotalIncome(incSum);
     setTotalExpense(expSum);
@@ -150,13 +148,9 @@ export default function DashboardScreen() {
     setRefreshing(false);
   };
 
-  const now = new Date();
-  const isCurrentMonth = selectedMonth === now.getMonth() && selectedYear === now.getFullYear();
-  const isCurrentYear = selectedYear === now.getFullYear();
-  const canGoForward = timeFilter === 'month' ? !isCurrentMonth : !isCurrentYear;
+  const canGoForward = true;
 
   const navigateMonth = (dir: -1 | 1) => {
-    if (dir === 1 && isCurrentMonth) return;
     let newMonth = selectedMonth + dir;
     let newYear = selectedYear;
     if (newMonth < 0) { newMonth = 11; newYear--; }
@@ -166,7 +160,6 @@ export default function DashboardScreen() {
   };
 
   const navigateYear = (dir: -1 | 1) => {
-    if (dir === 1 && isCurrentYear) return;
     setSelectedYear((y) => y + dir);
   };
 
@@ -399,13 +392,18 @@ function EntryRow({ entry }: { entry: UnifiedEntry }) {
         <Text style={rowStyles.title} numberOfLines={1}>
           {entry.description || entry.label || 'Transaction'}
         </Text>
-        <View style={rowStyles.metaRow}>
-          <Text style={rowStyles.meta}>{entry.label}</Text>
-          {entry.frequency !== 'one-time' && (
-            <View style={rowStyles.freqBadge}>
-              <Text style={rowStyles.freqText}>{entry.frequency}</Text>
-            </View>
-          )}
+          <View style={rowStyles.metaRow}>
+            <Text style={rowStyles.meta}>{entry.label}</Text>
+            {entry.isPredicted && (
+              <View style={[rowStyles.freqBadge, { backgroundColor: `${Colors.warning}22`, paddingHorizontal: 6, paddingVertical: 4 }]}>
+                <Ionicons name="sparkles" size={12} color={Colors.warning} />
+              </View>
+            )}
+            {!entry.isPredicted && entry.frequency !== 'one-time' && (
+              <View style={rowStyles.freqBadge}>
+                <Text style={rowStyles.freqText}>{entry.frequency}</Text>
+              </View>
+            )}
           {entry.expenseType && (
             <View style={[rowStyles.freqBadge, entry.expenseType === 'fixed' && { backgroundColor: `${Colors.warning}22` }]}>
               <Text style={[rowStyles.freqText, entry.expenseType === 'fixed' && { color: Colors.warning }]}>

@@ -1,10 +1,13 @@
 import React, { useState, useRef } from 'react';
 import {
   Text, TouchableOpacity, Animated, StyleSheet,
+  Modal, View, Dimensions, Pressable,
   type TextStyle, type ViewStyle,
 } from 'react-native';
 import { formatCompactCurrency } from '@/utils/currency';
 import { Colors, Radius, Spacing } from '@/constants/Theme';
+
+const { width: SCREEN_WIDTH } = Dimensions.get('window');
 
 interface CompactAmountProps {
   /** The raw numeric amount */
@@ -35,24 +38,30 @@ export default function CompactAmount({
 }: CompactAmountProps) {
   const { short, full } = formatCompactCurrency(amount);
   const [showTooltip, setShowTooltip] = useState(false);
+  const [tooltipPos, setTooltipPos] = useState({ top: 0, right: 0 });
+  
   const fadeAnim = useRef(new Animated.Value(0)).current;
   const timerRef = useRef<ReturnType<typeof setTimeout> | null>(null);
-
-  // Only show tooltip if the compact form is actually different from full
-  const isCompact = short !== full.replace('.00', '');
+  const anchorRef = useRef<View>(null);
 
   const showTip = () => {
-    if (!isCompact) return;
-    setShowTooltip(true);
-    Animated.timing(fadeAnim, {
-      toValue: 1,
-      duration: 200,
-      useNativeDriver: true,
-    }).start();
+    // Measure the exact position on screen to render the tooltip modal safely above everything
+    anchorRef.current?.measureInWindow((x, y, width, height) => {
+      setTooltipPos({
+        top: y + height + 4,
+        right: SCREEN_WIDTH - (x + width),
+      });
+      setShowTooltip(true);
+      
+      Animated.timing(fadeAnim, {
+        toValue: 1,
+        duration: 200,
+        useNativeDriver: true,
+      }).start();
 
-    // Auto-hide after 2.5s
-    if (timerRef.current) clearTimeout(timerRef.current);
-    timerRef.current = setTimeout(hideTip, 2500);
+      if (timerRef.current) clearTimeout(timerRef.current);
+      timerRef.current = setTimeout(hideTip, 2500);
+    });
   };
 
   const hideTip = () => {
@@ -75,34 +84,47 @@ export default function CompactAmount({
   const textColor = color || (style as any)?.color || Colors.textPrimary;
 
   return (
-    <TouchableOpacity
-      onPress={toggleTip}
-      onLongPress={showTip}
-      activeOpacity={0.7}
-      style={tooltipStyles.wrapper}
-      disabled={!isCompact}
-    >
-      <Text
-        style={[style, color ? { color } : undefined]}
-        numberOfLines={numberOfLines}
-        adjustsFontSizeToFit={adjustsFontSizeToFit}
+    <>
+      <TouchableOpacity
+        onPress={toggleTip}
+        onLongPress={showTip}
+        activeOpacity={0.7}
       >
-        {prefix}{short}
-      </Text>
-
-      {showTooltip && (
-        <Animated.View
-          style={[
-            tooltipStyles.tooltip,
-            { opacity: fadeAnim, borderColor: `${textColor}33` },
-          ]}
-        >
-          <Text style={[tooltipStyles.tooltipText, { color: textColor }]}>
-            {prefix}{full}
+        <View ref={anchorRef} style={tooltipStyles.wrapper} collapsable={false}>
+          <Text
+            style={[style, color ? { color } : undefined]}
+            numberOfLines={numberOfLines}
+            adjustsFontSizeToFit={adjustsFontSizeToFit}
+          >
+            {prefix}{short}
           </Text>
-        </Animated.View>
-      )}
-    </TouchableOpacity>
+        </View>
+      </TouchableOpacity>
+
+      <Modal visible={showTooltip} transparent animationType="none" onRequestClose={hideTip}>
+        <Pressable style={StyleSheet.absoluteFill} onPress={hideTip}>
+          <Animated.View
+            style={[
+              tooltipStyles.tooltip,
+              { 
+                top: tooltipPos.top, 
+                right: tooltipPos.right,
+                opacity: fadeAnim, 
+                borderColor: `${textColor}33` 
+              },
+            ]}
+          >
+            <Text 
+              style={[tooltipStyles.tooltipText, { color: textColor }]} 
+              numberOfLines={1}
+              ellipsizeMode="tail"
+            >
+              {prefix}{full}
+            </Text>
+          </Animated.View>
+        </Pressable>
+      </Modal>
+    </>
   );
 }
 
@@ -113,10 +135,7 @@ const tooltipStyles = StyleSheet.create({
   },
   tooltip: {
     position: 'absolute',
-    top: '100%',
-    right: 0,
-    marginTop: 4,
-    backgroundColor: Colors.surface,
+    backgroundColor: '#000000', // Pure black to ensure it is completely opaque
     paddingHorizontal: 10,
     paddingVertical: 5,
     borderRadius: Radius.sm,
@@ -132,5 +151,6 @@ const tooltipStyles = StyleSheet.create({
     fontSize: 12,
     fontWeight: '600',
     letterSpacing: 0.3,
+    flexShrink: 0, // prevents text wrapping
   },
 });

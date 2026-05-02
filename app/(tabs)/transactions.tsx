@@ -13,6 +13,7 @@ import { Colors, Gradients, Spacing, Radius } from '@/constants/Theme';
 import { Icons } from '@/constants/Icons';
 import CompactAmount from '@/components/CompactAmount';
 import type { TimeFilter, UnifiedEntry, Expense, Income } from '@/utils/types';
+import { processEntries } from '@/utils/calculations';
 
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -77,18 +78,13 @@ export default function TransactionsScreen() {
     let expQ = supabase.from('expenses').select('*').eq('user_id', user.id).is('deleted_at', null);
     let incQ = supabase.from('income').select('*').eq('user_id', user.id).is('deleted_at', null);
 
-    if (dateRange) {
-      expQ = expQ.gte('start_date', dateRange.start).lte('start_date', dateRange.end);
-      incQ = incQ.gte('start_date', dateRange.start).lte('start_date', dateRange.end);
-    }
-
     const [{ data: expenses }, { data: incomes }] = await Promise.all([expQ, incQ]);
 
-    const unified: UnifiedEntry[] = [];
+    const rawUnified: UnifiedEntry[] = [];
 
     if (incomes) {
       (incomes as Income[]).forEach((i) => {
-        unified.push({
+        rawUnified.push({
           id: i.id,
           amount: Number(i.amount),
           kind: 'income',
@@ -104,7 +100,7 @@ export default function TransactionsScreen() {
 
     if (expenses) {
       (expenses as Expense[]).forEach((e) => {
-        unified.push({
+        rawUnified.push({
           id: e.id,
           amount: Number(e.amount),
           kind: 'expense',
@@ -120,11 +116,9 @@ export default function TransactionsScreen() {
       });
     }
 
-    unified.sort((a, b) => {
-      const d = b.date.localeCompare(a.date);
-      if (d !== 0) return d;
-      return b.created_at.localeCompare(a.created_at);
-    });
+    const unified = processEntries(rawUnified, timeFilter, dateRange);
+
+    // processEntries handles sorting
 
     setEntries(unified);
     setLoading(false);
@@ -139,10 +133,9 @@ export default function TransactionsScreen() {
   const now = new Date();
   const isCurrentMonth = selectedMonth === now.getMonth() && selectedYear === now.getFullYear();
   const isCurrentYear = selectedYear === now.getFullYear();
-  const canGoForward = timeFilter === 'month' ? !isCurrentMonth : !isCurrentYear;
+  const canGoForward = timeFilter !== 'all';
 
   const navigateMonth = (dir: -1 | 1) => {
-    if (dir === 1 && isCurrentMonth) return;
     let newMonth = selectedMonth + dir;
     let newYear = selectedYear;
     if (newMonth < 0) { newMonth = 11; newYear--; }
@@ -152,7 +145,6 @@ export default function TransactionsScreen() {
   };
 
   const navigateYear = (dir: -1 | 1) => {
-    if (dir === 1 && isCurrentYear) return;
     setSelectedYear((y) => y + dir);
   };
 
@@ -244,10 +236,11 @@ export default function TransactionsScreen() {
     if (!deleteTarget || deleteInput.toLowerCase() !== 'delete') return;
     setDeleting(true);
     const table = deleteTarget.kind === 'income' ? 'income' : 'expenses';
+    const realId = deleteTarget.original_id || deleteTarget.id;
     const { error } = await supabase
       .from(table)
       .update({ deleted_at: new Date().toISOString() })
-      .eq('id', deleteTarget.id);
+      .eq('id', realId);
     setDeleting(false);
     if (error) { Alert.alert('Error', 'Failed to delete entry.'); return; }
     closeDeleteModal();
@@ -270,10 +263,11 @@ export default function TransactionsScreen() {
     if (!endTarget || !isEndDateValid()) return;
     setEnding(true);
     const table = endTarget.kind === 'income' ? 'income' : 'expenses';
+    const realId = endTarget.original_id || endTarget.id;
     const { error } = await supabase
       .from(table)
       .update({ end_date: endDateInput })
-      .eq('id', endTarget.id);
+      .eq('id', realId);
     setEnding(false);
     if (error) { Alert.alert('Error', 'Failed to end entry.'); return; }
     closeEndModal();
@@ -300,7 +294,12 @@ export default function TransactionsScreen() {
           </Text>
           <View style={styles.metaRow}>
             <Text style={styles.meta}>{item.label}</Text>
-            {item.frequency !== 'one-time' && (
+            {item.isPredicted && (
+              <View style={[styles.badge, { backgroundColor: `${Colors.warning}22`, paddingHorizontal: 6, paddingVertical: 4 }]}>
+                <Ionicons name="sparkles" size={12} color={Colors.warning} />
+              </View>
+            )}
+            {!item.isPredicted && item.frequency !== 'one-time' && (
               <View style={styles.badge}>
                 <Text style={styles.badgeText}>{item.frequency}</Text>
               </View>
