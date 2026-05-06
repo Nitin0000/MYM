@@ -19,6 +19,7 @@ import {
   type ExpenseType, type ExpenseFrequency,
   type IncomeType, type IncomeFrequency,
 } from '@/utils/types';
+import { toLocalDateString } from '@/utils/calculations';
 
 export default function AddTransactionScreen() {
   const { user } = useAuth();
@@ -82,7 +83,7 @@ export default function AddTransactionScreen() {
           category: category.trim(),
           type: expenseType,
           frequency: expenseFrequency,
-          start_date: date.toISOString().split('T')[0],
+          start_date: toLocalDateString(date),
           is_essential: isEssential,
           description: description.trim() || null,
         });
@@ -93,7 +94,7 @@ export default function AddTransactionScreen() {
           amount: parsed,
           type: incomeType,
           frequency: incomeFrequency,
-          start_date: date.toISOString().split('T')[0],
+          start_date: toLocalDateString(date),
           description: description.trim() || null,
         });
         if (error) throw error;

@@ -50,12 +50,11 @@ export default function DashboardScreen() {
     if (timeFilter === 'all') return null;
 
     if (timeFilter === 'month') {
-      const start = new Date(selectedYear, selectedMonth, 1);
-      const end = new Date(selectedYear, selectedMonth + 1, 0); // last day of month
-      return {
-        start: start.toISOString().split('T')[0],
-        end: end.toISOString().split('T')[0],
-      };
+      const monthStr = String(selectedMonth + 1).padStart(2, '0');
+      const start = `${selectedYear}-${monthStr}-01`;
+      const lastDay = new Date(selectedYear, selectedMonth + 1, 0).getDate();
+      const end = `${selectedYear}-${monthStr}-${String(lastDay).padStart(2, '0')}`;
+      return { start, end };
     }
 
     // year

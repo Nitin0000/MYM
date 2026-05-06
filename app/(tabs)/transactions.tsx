@@ -13,7 +13,7 @@ import { Colors, Gradients, Spacing, Radius } from '@/constants/Theme';
 import { Icons } from '@/constants/Icons';
 import CompactAmount from '@/components/CompactAmount';
 import type { TimeFilter, UnifiedEntry, Expense, Income } from '@/utils/types';
-import { processEntries } from '@/utils/calculations';
+import { processEntries, toLocalDateString } from '@/utils/calculations';
 
 const MONTHS = [
   'January', 'February', 'March', 'April', 'May', 'June',
@@ -62,9 +62,11 @@ export default function TransactionsScreen() {
   const getDateRange = useCallback((): { start: string; end: string } | null => {
     if (timeFilter === 'all') return null;
     if (timeFilter === 'month') {
-      const start = new Date(selectedYear, selectedMonth, 1);
-      const end = new Date(selectedYear, selectedMonth + 1, 0);
-      return { start: start.toISOString().split('T')[0], end: end.toISOString().split('T')[0] };
+      const monthStr = String(selectedMonth + 1).padStart(2, '0');
+      const start = `${selectedYear}-${monthStr}-01`;
+      const lastDay = new Date(selectedYear, selectedMonth + 1, 0).getDate();
+      const end = `${selectedYear}-${monthStr}-${String(lastDay).padStart(2, '0')}`;
+      return { start, end };
     }
     return { start: `${selectedYear}-01-01`, end: `${selectedYear}-12-31` };
   }, [timeFilter, selectedMonth, selectedYear]);
@@ -220,7 +222,7 @@ export default function TransactionsScreen() {
     closeActionModal();
     setTimeout(() => {
       setEndTarget(actionTarget);
-      setEndDateInput(new Date().toISOString().split('T')[0]);
+      setEndDateInput(toLocalDateString(new Date()));
       setEndModalVisible(true);
     }, 250);
   };

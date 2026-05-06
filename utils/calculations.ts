@@ -1,4 +1,11 @@
-import { UnifiedEntry, TimeFilter } from './types';
+import { TimeFilter, UnifiedEntry } from './types';
+
+export function toLocalDateString(date: Date = new Date()): string {
+  const y = date.getFullYear();
+  const m = String(date.getMonth() + 1).padStart(2, '0');
+  const d = String(date.getDate()).padStart(2, '0');
+  return `${y}-${m}-${d}`;
+}
 
 export function getOccurrences(entry: UnifiedEntry, viewStart: string, viewEnd: string): UnifiedEntry[] {
   if (entry.frequency === 'one-time') {
@@ -8,12 +15,12 @@ export function getOccurrences(entry: UnifiedEntry, viewStart: string, viewEnd: 
 
   const occurrences: UnifiedEntry[] = [];
   let current = new Date(entry.date);
-  
+
   // Use a fallback end date far in the future if none is provided, 
   // but strictly bound it by the viewEnd to prevent infinite loops
   const endLimit = entry.endDate ? new Date(entry.endDate) : new Date(viewEnd);
   const actualEnd = new Date(Math.min(endLimit.getTime(), new Date(viewEnd).getTime()));
-  
+
   const vStart = new Date(viewStart);
   const today = new Date();
   today.setHours(0, 0, 0, 0); // normalize to start of day for comparison
@@ -41,20 +48,20 @@ export function getOccurrences(entry: UnifiedEntry, viewStart: string, viewEnd: 
       break; // failsafe
     }
   }
-  
+
   return occurrences;
 }
 
 export function processEntries(
-  rawEntries: UnifiedEntry[], 
-  timeFilter: TimeFilter, 
+  rawEntries: UnifiedEntry[],
+  timeFilter: TimeFilter,
   viewRange: { start: string, end: string } | null
 ): UnifiedEntry[] {
   // If 'all', view from 1970 to today. We don't predict infinitely into the future for 'all'.
   const vStart = viewRange ? viewRange.start : '1970-01-01';
-  const vEnd = viewRange ? viewRange.end : new Date().toISOString().split('T')[0];
-  const todayStr = new Date().toISOString().split('T')[0];
-  
+  const vEnd = viewRange ? viewRange.end : toLocalDateString(new Date());
+  const todayStr = toLocalDateString(new Date());
+
   let processed: UnifiedEntry[] = [];
 
   for (const entry of rawEntries) {
@@ -67,7 +74,7 @@ export function processEntries(
       // For Yearly or All-Time, we aggregate occurrences into a single row
       const sum = occs.reduce((acc, o) => acc + o.amount, 0);
       const isAnyPredicted = occs.some(o => o.isPredicted);
-      
+
       processed.push({
         ...entry,
         amount: sum,
@@ -98,7 +105,7 @@ export function processEntries(
 
     const avgVarInc = varInc / monthsDiff;
     const avgVarExp = varExp / monthsDiff;
-    
+
     // Scale for Yearly view if needed
     const multiplier = timeFilter === 'year' ? 12 : 1;
 
