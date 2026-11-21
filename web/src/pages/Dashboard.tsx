@@ -152,6 +152,13 @@ export default function Dashboard() {
     setSelectedYear((y) => y + dir);
   };
 
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 17) return 'Good afternoon';
+    return 'Good evening';
+  };
+
   const firstName = user?.user_metadata?.full_name?.split(' ')[0] || 'there';
   const filterLabel =
     timeFilter === 'month'
@@ -168,7 +175,7 @@ export default function Dashboard() {
       <div className="flex items-center justify-between mb-6">
         <div>
           <h1 className="text-2xl sm:text-3xl font-extrabold text-white tracking-tight">
-            Good day, {firstName} 👋
+            {getGreeting()}, {firstName} 👋
           </h1>
           <p className="text-sm text-[#9898B3] mt-0.5">Here's your financial overview</p>
         </div>

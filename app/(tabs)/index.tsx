@@ -162,6 +162,13 @@ export default function DashboardScreen() {
     setSelectedYear((y) => y + dir);
   };
 
+  const getGreeting = () => {
+    const hour = new Date().getHours();
+    if (hour < 12) return 'Good morning';
+    if (hour < 17) return 'Good afternoon';
+    return 'Good evening';
+  };
+
   const firstName = user?.user_metadata?.full_name?.split(' ')[0] || 'there';
   const filterLabel = timeFilter === 'month'
     ? `${MONTHS[selectedMonth]} ${selectedYear}`
@@ -194,7 +201,7 @@ export default function DashboardScreen() {
         <View style={styles.headerLeft}>
           <Image source={require('@/assets/images/logo.png')} style={styles.headerLogo} />
           <View>
-            <Text style={styles.greeting}>Good day, {firstName} 👋</Text>
+            <Text style={styles.greeting}>{getGreeting()}, {firstName} 👋</Text>
             <Text style={styles.subGreeting}>Here's your financial overview</Text>
           </View>
         </View>
